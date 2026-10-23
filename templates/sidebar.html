@@ -1,0 +1,207 @@
+<!-- Application shell -->
+<div id="beans-app-shell" class="beans-app-shell">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="beans-sidebar" aria-label="Application sidebar">
+        <div class="beans-sidebar-brand"></div>
+
+        <div class="beans-sidebar-actions">
+            <button class="beans-nav-button active" id="beans-home-button" type="button">
+                <span class="beans-nav-icon">⌂</span><span>Home</span>
+            </button>
+            <button class="beans-nav-button" id="beans-url-history-button" type="button">
+                <span class="beans-nav-icon">↶</span><span>URL History</span>
+            </button>
+            <button class="beans-nav-button" id="beans-downloads-button" type="button">
+                <span class="beans-nav-icon">↓</span><span>Downloads</span>
+                <span class="beans-nav-count" id="beans-download-count"></span>
+            </button>
+        </div>
+
+        <div class="beans-sidebar-section-head">
+            <span>RECENT URLS</span>
+            <button type="button" id="beans-clear-urls" title="Clear URL history">Clear</button>
+        </div>
+
+        <div class="beans-url-list" id="beans-url-list">
+            <div class="beans-empty-state">Your analyzed URLs will appear here.</div>
+        </div>
+
+        <div class="beans-sidebar-bottom">
+            <button class="beans-nav-button" id="beans-settings-button" type="button">
+                <span class="beans-nav-icon">⚙</span><span>Settings</span>
+                <span class="beans-chevron" id="beans-settings-chevron">⌄</span>
+            </button>
+
+            <div class="beans-settings-expand" id="beans-settings-expand" hidden>
+                <p>Download folder, subtitles, and cookies</p>
+                <button type="button" id="beans-open-settings">Open settings</button>
+            </div>
+
+            <button class="beans-theme-button" id="beans-theme-toggle" type="button">
+                <span id="beans-theme-icon">☾</span>
+                <span id="beans-theme-label">Dark mode</span>
+                <span class="beans-theme-switch"><i></i></span>
+            </button>
+
+            <div class="beans-sidebar-footer">
+                Beans Extractor <span>by CoffeeUnderFlow</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="beans-workspace">
+        <header class="beans-topbar">
+            <div>
+                <div class="beans-page-eyebrow">MEDIA TOOLKIT</div>
+                <div class="beans-page-title" id="beans-page-title">Home</div>
+            </div>
+            <button type="button" class="beans-top-downloads" id="beans-top-downloads">
+                <span>↓</span> Downloads
+            </button>
+        </header>
+
+        <div class="beans-workspace-content"></div>
+    </main>
+
+    <!-- DOWNLOAD DRAWER BACKDROP -->
+    <div class="beans-drawer-scrim" id="beans-drawer-scrim"></div>
+
+    <!-- RIGHT DOWNLOAD DRAWER -->
+    <aside class="beans-download-drawer" id="beans-download-drawer"
+        aria-label="Download history" aria-hidden="true">
+
+        <div class="beans-drawer-header">
+            <div><h2>Downloads</h2></div>
+            <button type="button" id="beans-close-drawer" aria-label="Close downloads">×</button>
+        </div>
+
+        <div class="beans-download-active" id="beans-download-active"></div>
+
+        <div class="beans-drawer-list-head">
+            <span>DOWNLOAD HISTORY</span>
+            <button type="button" id="beans-clear-downloads">Clear history</button>
+        </div>
+
+        <div class="beans-download-list" id="beans-download-list">
+            <div class="beans-empty-state">No downloads yet.</div>
+        </div>
+
+        <p class="beans-history-note">
+            Clearing history never deletes downloaded files.
+        </p>
+    </aside>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal"
+        style="display:none;position:fixed;inset:0;width:100%;height:100%;
+        background:rgba(0,0,0,.7);z-index:1300;justify-content:center;align-items:center;">
+
+        <div class="settings-modal-content"
+            style="background:#1e1e2f;color:#fff;padding:25px;border-radius:12px;
+            box-shadow:0 8px 24px rgba(0,0,0,.5);font-family:sans-serif;">
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h3 style="margin:0;font-size:1.2rem;color:#ff9800;">Application Settings</h3>
+                <button onclick="closeSettingsModal()"
+                    style="background:none;border:none;color:#aaa;font-size:1.2rem;cursor:pointer;"
+                    aria-label="Close settings">&times;</button>
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label for="setting-download-dir"
+                    style="display:block;font-size:.9rem;margin-bottom:5px;color:#ccc;">
+                    Download Directory
+                </label>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="setting-download-dir"
+                        style="flex:1;min-width:0;padding:8px;background:#2a2a3d;
+                        border:1px solid #444;border-radius:6px;color:#fff;box-sizing:border-box;">
+                    <button onclick="selectFolder()"
+                        style="padding:8px 14px;background:#444;color:#fff;border:none;
+                        border-radius:6px;cursor:pointer;font-size:.85rem;">Browse...</button>
+                </div>
+            </div>
+
+            <section id="subtitle-settings-block">
+                <div class="me-subtitle-row">
+                    <div><div class="me-subtitle-title">Include Subtitles</div></div>
+                    <label class="me-subtitle-switch" aria-label="Include subtitles">
+                        <input id="settings-include-subtitles" type="checkbox"
+                            aria-label="Include subtitles">
+                        <span class="me-subtitle-slider"></span>
+                    </label>
+                </div>
+
+                <div id="settings-subtitle-language-group"
+                    class="me-subtitle-language" style="display:none;">
+                    <label for="settings-subtitle-language">Subtitle language</label>
+                    <select id="settings-subtitle-language">
+                        <option value="en" selected>English</option>
+                        <option value="hi">Hindi</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ar">Arabic</option>
+                        <option value="bn">Bengali</option>
+                        <option value="zh-Hans">Chinese (Simplified)</option>
+                        <option value="zh-Hant">Chinese (Traditional)</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="ru">Russian</option>
+                        <option value="it">Italian</option>
+                        <option value="ur">Urdu</option>
+                        <option value="pa">Punjabi</option>
+                        <option value="ta">Tamil</option>
+                        <option value="te">Telugu</option>
+                        <option value="mr">Marathi</option>
+                        <option value="id">Indonesian</option>
+                        <option value="tr">Turkish</option>
+                        <option value="vi">Vietnamese</option>
+                        <option value="th">Thai</option>
+                        <option value="nl">Dutch</option>
+                        <option value="pl">Polish</option>
+                        <option value="sv">Swedish</option>
+                        <option value="uk">Ukrainian</option>
+                        <option value="fa">Persian</option>
+                        <option value="el">Greek</option>
+                        <option value="he">Hebrew</option>
+                    </select>
+                </div>
+            </section>
+
+            <div style="margin-bottom:20px;">
+                <label for="setting-cookies-file"
+                    style="display:block;font-size:.9rem;margin-bottom:5px;color:#ccc;">
+                    Fallback Cookies File (cookies.txt)
+                </label>
+                <input type="file" id="setting-cookies-file" accept=".txt"
+                    style="font-size:.85rem;color:#aaa;max-width:100%;">
+                <button onclick="uploadCookiesFile()"
+                    style="margin-top:8px;padding:6px 12px;background:#444;color:#fff;
+                    border:none;border-radius:4px;cursor:pointer;font-size:.85rem;">
+                    Upload Cookies File
+                </button>
+                <span id="cookie-upload-status"
+                    style="font-size:.8rem;margin-left:10px;color:#4caf50;"></span>
+            </div>
+
+            <div style="background:#252538;padding:10px;border-radius:6px;font-size:.8rem;
+                color:#aaa;margin-bottom:20px;">
+                <strong>Help:</strong> If access to a media site fails, export your cookies
+                as a text file and upload it above as a fallback.
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button onclick="closeSettingsModal()"
+                    style="padding:8px 16px;background:#333;color:#fff;border:none;
+                    border-radius:6px;cursor:pointer;">Cancel</button>
+                <button id="settings-save-btn" onclick="saveSettings()"
+                    style="padding:8px 16px;background:#ff9800;color:#000;font-weight:bold;
+                    border:none;border-radius:6px;cursor:pointer;">Save Settings</button>
+            </div>
+        </div>
+    </div>
+</div>

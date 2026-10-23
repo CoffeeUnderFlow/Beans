@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='sidebar.css') }}">
+    <title>Beans Extractor</title>
+
+    <style id="media-extractor-subtitle-setting-style">
+        #subtitle-settings-block {
+            margin: 18px 0;
+            padding: 16px;
+            border: 1px solid var(--border-color, rgba(128, 128, 128, .3));
+            border-radius: 12px
+        }
+
+        #subtitle-settings-block .me-subtitle-title {
+            font-weight: 600;
+            margin-bottom: 4px
+        }
+
+        #subtitle-settings-block .me-subtitle-help {
+            font-size: .88em;
+            opacity: .75;
+            line-height: 1.4
+        }
+
+        #subtitle-settings-block .me-subtitle-language {
+            margin-top: 14px
+        }
+
+        #subtitle-settings-block .me-subtitle-language label {
+            display: block;
+            margin-bottom: 7px;
+            font-weight: 500
+        }
+
+        #settings-subtitle-language {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color, rgba(128, 128, 128, .4));
+            background: var(--input-bg, #2a2a3d);
+            color: inherit
+        }
+
+        .me-subtitle-switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 26px;
+            flex: 0 0 46px
+        }
+
+        .me-subtitle-switch input {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px
+        }
+
+        .me-subtitle-slider {
+            position: absolute;
+            inset: 0;
+            cursor: pointer;
+            border-radius: 26px;
+            background: #858585;
+            transition: background .2s
+        }
+
+        .me-subtitle-slider::before {
+            content: '';
+            position: absolute;
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            top: 3px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform .2s
+        }
+
+        .me-subtitle-switch input:checked+.me-subtitle-slider {
+            background: var(--accent, #ff9800)
+        }
+
+        .me-subtitle-switch input:checked+.me-subtitle-slider::before {
+            transform: translateX(20px)
+        }
+
+        .me-subtitle-switch input:focus-visible+.me-subtitle-slider {
+            outline: 2px solid var(--accent, #ff9800);
+            outline-offset: 2px
+        }
+
+        #settings-modal .settings-modal-content {
+            width: min(450px, calc(100vw - 32px));
+            max-height: 90vh;
+            overflow-y: auto;
+            box-sizing: border-box
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-branding">
+        <h1 class="brand-title">Beans Extractor</h1>
+        <p class="brand-subtitle">by <a href="https://coffeeunderflow.in" target="_blank"
+                rel="noopener noreferrer">CoffeeUnderFlow</a></p>
+    </div>
+
+    <button id="menuToggle" class="menu-toggle" onclick="openSettingsModal()" aria-label="Open settings"
+        title="Settings">
+        <span></span><span></span><span></span>
+    </button>
+
+    <!-- Sidebar shell: contains workspace and drawer -->
+    {% include 'sidebar.html' %}
+
+    <!-- Original extractor content -->
+    <div class="extractor-card">
+        <div id="error-banner" class="error-banner" style="display: none;"></div>
+
+        <!-- PHASE 2: URL Input -->
+        <div id="phase-2">
+            <form id="inspect-form" class="input-group">
+                <input type="text" id="url-input" placeholder="Paste video or media link..." required autofocus>
+                <button type="submit" id="inspect-btn" class="btn-primary">
+                    <span id="btn-text">Analyze Media</span>
+                    <div class="loader-dots" id="btn-loader" style="display: none;">
+                        <span></span><span></span><span></span><span></span>
+                    </div>
+                </button>
+            </form>
+        </div>
+
+        <!-- PHASE 3: Dashboard & Pipelines -->
+        <div id="phase-3" class="phase-view" style="display: none;">
+
+            <!-- VIDEO/AUDIO UI -->
+            <div id="video-ui">
+                <div class="preview-box">
+                    <img id="meta-thumb" src="" alt="Thumbnail">
+                    <div class="preview-meta">
+                        <div id="meta-title">Loading...</div>
+                        <div id="meta-duration">00:00</div>
+                    </div>
+                </div>
+                <p class="section-label">Select Output Format</p>
+                <div id="quality-grid" class="quality-grid"></div>
+                <button id="download-btn" class="btn-primary" onclick="triggerDownload()">Download Stream</button>
+            </div>
+
+            <!-- IMAGE GALLERY UI -->
+            <div id="image-ui" style="display: none;">
+                <div class="carousel-viewport">
+                    <button id="carousel-prev" class="btn-secondary carousel-btn"
+                        aria-label="Previous image">&#8592;</button>
+                    <img id="carousel-main-img" src="" alt="Gallery Preview">
+                    <button id="carousel-next" class="btn-secondary carousel-btn"
+                        aria-label="Next image">&#8594;</button>
+                </div>
+                <p class="section-label">Select Images to Download</p>
+                <div id="image-grid" class="quality-grid"></div>
+                <button id="dl-selected-btn" class="btn-primary" onclick="triggerImageDownload()">Download
+                    Selected</button>
+            </div>
+
+            <!-- SHARED PROGRESS -->
+            <div id="progress-box" class="progress-box" style="display: none;">
+                <div class="progress-track">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <div class="progress-text">
+                    <span id="progress-status">Starting download...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+            </div>
+
+            <button class="btn-secondary cancel-btn" onclick="cancelAndExtractAnother()">Cancel &amp; Extract
+                Another</button>
+        </div>
+
+        <script src="{{ url_for('static', filename='main.js') }}"></script>
+        <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
+</body>
+
+</html>
+
+
+<!--  
+⣠⣾⡿⠿⣿⣦⠀⠀⠀⠀⠀⠀
+⣿⣿⠀⠀⠈⠁⠀⠀⠀⠀⠀⠀
+⠻⣿⣦⣤⣾⡿⠀⠀⠀⠀⠀⠀
+⠀⠈⠉⠉⠉⠀⢠⣤⣤⣤⣤⣤
+-->
