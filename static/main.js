@@ -805,15 +805,28 @@ const uploadCookiesFile = async () => {
     }
 };
 
-// Trigger native folder selection dialog via backend endpoint
+// Open the native folder picker and select the final download directory.
 const selectFolder = async () => {
     try {
-        const response = await fetch('/api/select-folder', { method: 'POST' });
+        const response = await fetch('/api/select-folder', {
+            method: 'POST'
+        });
+
         const data = await getJsonResponse(response);
+
+        if (data.cancelled) return;
+
         const folder = data.path || data.folder;
 
         if (data.success && folder && $('setting-download-dir')) {
-            $('setting-download-dir').value = folder;
+            const normalizedFolder = folder.replace(/[\\/]+$/, '');
+
+            const destination = /[\\/]Beans Extractor$/i.test(normalizedFolder)
+                ? normalizedFolder
+                : `${normalizedFolder}\\Beans Extractor`;
+
+            $('setting-download-dir').value = destination;
+
             updateDownloadDirPreview();
         }
     } catch (err) {
@@ -828,20 +841,10 @@ const updateDownloadDirPreview = () => {
 
     if (!input || !preview) return;
 
-    const parentFolder = input.value.trim();
-
-    if (!parentFolder) {
-        preview.textContent = '';
-        return;
-    }
-
-    const normalizedParent = parentFolder.replace(/[\\/]+$/, '');
-
-    const destination = /[\\/]Beans Extractor$/i.test(normalizedParent)
-        ? normalizedParent
-        : `${normalizedParent}\\Beans Extractor`;
-
-    preview.textContent = `Downloads will be saved to: ${destination}`;
+    const destination = input.value.trim();
+    preview.textContent = destination
+        ? `Downloads will be saved to: ${destination}`
+        : '';
 };
 
 window.addEventListener('DOMContentLoaded', () => {

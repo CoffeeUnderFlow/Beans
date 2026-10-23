@@ -40,6 +40,19 @@ APP_DATA_DIR = os.path.join(
 )
 SETTINGS_FILE = os.path.join(APP_DATA_DIR, 'settings.json')
 
+def normalize_download_dir(path):
+    """Ensure downloads are stored inside a Beans Extractor subfolder."""
+    path = os.path.abspath(
+        os.path.normpath(
+            os.path.expanduser(str(path).strip())
+        )
+    )
+
+    if os.path.basename(path).casefold() != 'beans extractor':
+        path = os.path.join(path, 'Beans Extractor')
+
+    return path
+
 DEFAULT_CONFIG = {
     'download_dir': os.path.join(USER_HOME, 'Downloads', 'Beans Extractor'),
     'browser_choice': 'chrome',
@@ -50,22 +63,41 @@ DEFAULT_CONFIG = {
 
 def load_config():
     config = DEFAULT_CONFIG.copy()
+
     try:
         with open(SETTINGS_FILE, 'r', encoding='utf-8') as settings_file:
             saved = json.load(settings_file)
+
         if isinstance(saved, dict):
-            config.update({key: saved[key] for key in DEFAULT_CONFIG if key in saved})
+            config.update({
+                key: saved[key]
+                for key in DEFAULT_CONFIG
+                if key in saved
+            })
+
     except (OSError, ValueError, TypeError):
         pass
 
     if not isinstance(config.get('include_subtitles'), bool):
         config['include_subtitles'] = False
-    if not isinstance(config.get('subtitle_language'), str) or not config['subtitle_language']:
-        config['subtitle_language'] = 'en'
-    if not isinstance(config.get('download_dir'), str) or not config['download_dir']:
-        config['download_dir'] = DEFAULT_CONFIG['download_dir']
-    return config
 
+    if (
+        not isinstance(config.get('subtitle_language'), str)
+        or not config['subtitle_language']
+    ):
+        config['subtitle_language'] = 'en'
+
+    if (
+        not isinstance(config.get('download_dir'), str)
+        or not config['download_dir'].strip()
+    ):
+        config['download_dir'] = DEFAULT_CONFIG['download_dir']
+
+    config['download_dir'] = normalize_download_dir(
+        config['download_dir']
+    )
+
+    return config
 
 def save_config():
     os.makedirs(APP_DATA_DIR, exist_ok=True)
@@ -853,11 +885,7 @@ def api_settings():
         new_dir = data.get('download_dir')
 
         if isinstance(new_dir, str) and new_dir.strip():
-            new_dir = os.path.abspath(
-                os.path.normpath(
-                    os.path.expanduser(new_dir.strip())
-                )
-            )
+            new_dir = normalize_download_dir(new_dir)
 
             try:
                 os.makedirs(new_dir, exist_ok=True)
@@ -1231,7 +1259,7 @@ def api_download():
                         candidate = max(float(task.get('progress_floor', 0.0)), 88.0)
                         task['progress_floor'] = candidate
                         task.update({'status': 'merging', 'percent': f'{candidate:.1f}%', 'overall_percent': f'{candidate:.1f}%'})
-                    TASKS[task_id].update({'status': 'merging', 'percent': '100%'})
+                    
 
             # Preserve existing direct/non-HLS-first video selection and the MP3 workflow.
             if mode == 'mp3':
