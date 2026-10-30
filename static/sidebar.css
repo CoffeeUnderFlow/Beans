@@ -1,1069 +1,303 @@
 /* =========================================================
-   BEANS EXTRACTOR — SIDEBAR AND DOWNLOAD HISTORY UPDATE
-   Defines the app's colors, layout, sidebar, workspace,
-   download drawer, history cards, and responsive behavior.
+   BEANS EXTRACTOR — SIDEBAR, WORKSPACE, DOWNLOADS & HISTORY
+   (cleaned: duplicates merged, theme-safe colors, media queries last)
    ========================================================= */
 
+/* ---------- Reset / globals ---------- */
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI Variable Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; scrollbar-color: var(--border) transparent; }
+html,
+body { width: 100%; height: 100%; min-height: 100%; }
+body { display: block; overflow: hidden; background: var(--bg-main); color: var(--text-main); }
+button,
+input,
+select,
+textarea { font: inherit; }
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.beans-info-tooltip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text-main); }
 
-/* ---------- 1. Global dark-theme color variables ---------- */
+/* ---------- Theme tokens ---------- */
 :root {
-  --bg-main: #0c0d10; /* Main app background */
-  --bg-card: #14161d; /* Card, sidebar, and panel backgrounds */
-  --bg-header: rgba(12, 13, 16, 0.85); /* Translucent header */
-  --bg-input: #07080a; /* Input and secondary backgrounds */
-  --accent: #d97706; /* Primary orange accent */
-  --accent-hover: #f59e0b; /* Brighter accent for hover states */
-  --text-main: #f3f4f6; /* Primary text color */
-  --text-muted: #9ca3af; /* Secondary and less prominent text */
-  --border: #272a36; /* Standard border color */
-  --logo-color: #ffffff; /* Logo text color */
-  --success: #10b981; /* Success and completed-download color */
-  --shadow: 0 20px 40px rgba(0, 0, 0, 0.5); /* Large panel shadow */
-  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); /* Card shadow */
-  --error-bg: rgba(239, 68, 68, 0.12); /* Error badge background */
-  --error-border: rgba(239, 68, 68, 0.3); /* Error border color */
-  --error-text: #ef4444; /* Error text color */
+  color-scheme: dark;
+  --bg-main: #0a0a0b; --bg-card: #161618; --bg-header: rgba(10, 10, 11, .85); --bg-input: #1f1f22;
+  --accent: #d97706; --accent-hover: #f59e0b;
+  --text-main: #f5f5f7; --text-muted: #98989f; --border: #2c2c30; --logo-color: #fff;
+  --success: #10b981;
+  --shadow: 0 20px 40px rgba(0, 0, 0, .5); --card-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+  --error-bg: rgba(239, 68, 68, .12); --error-border: rgba(239, 68, 68, .3); --error-text: #ef4444;
+  --hover-accent: rgba(255, 152, 0, .18);
 }
-
-/* ---------- 2. Light-theme color overrides ---------- */
 [data-theme="light"] {
-  --bg-main: #fcfaf8; /* Light main background */
-  --bg-card: #ffffff; /* White cards and panels */
-  --bg-header: rgba(248, 248, 248, 0.85); /* Light translucent header */
-  --bg-input: #f9f5f1; /* Light input background */
-  --accent: #d97706; /* Orange accent */
-  --accent-hover: #b45309; /* Darker orange on hover */
-  --text-main: #0f172a; /* Dark primary text */
-  --text-muted: #64748b; /* Muted gray-blue text */
-  --border: #f0e9e2; /* Light borders */
-  --logo-color: #0f172a; /* Dark logo text */
-  --success: #059669; /* Green success color */
-  --shadow: 0 20px 40px rgba(15, 23, 42, 0.08); /* Softer panel shadow */
-  --card-shadow: 0 4px 20px rgba(15, 23, 42, 0.05); /* Softer card shadow */
-  --error-bg: rgba(239, 68, 68, 0.08); /* Light error background */
-  --error-border: rgba(239, 68, 68, 0.25); /* Light error border */
-  --error-text: #dc2626; /* Error text */
-}
-
-/* ---------- 3. Base page and element behavior ---------- */
-html, body {
-  width: 100%;
-  height: 100%;
-  min-height: 100%;
-}
-
-/* Prevent unwanted page margins and outer scrolling */
-body {
-  display: block !important;
-  padding: 0 !important;
-  margin: 0;
-  overflow: hidden !important;
-  background: var(--bg-main) !important;
-  color: var(--text-main);
-}
-
-/* Use the theme border color for browser scrollbars */
-* {
-  scrollbar-color: var(--border) transparent;
-}
-
-/* Keep form controls consistent with the app's typography */
-button, input, select {
-  font: inherit;
-}
-
-/* Accessible keyboard-focus indicator */
-button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* ---------- 4. Main app shell and sidebar ---------- */
-
-/* Full-window flex layout containing sidebar and workspace */
-.beans-app-shell {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  background: var(--bg-main);
-  color: var(--text-main);
-  overflow: hidden;
-}
-
-/* Fixed-width navigation sidebar */
-.beans-sidebar {
-  width: 254px;
-  flex: 0 0 254px;
-  display: flex;
-  flex-direction: column;
-  padding: 22px 14px 14px;
-  border-right: 1px solid var(--border);
-  background: var(--bg-card);
-  min-height: 0;
-  z-index: 2;
-}
-
-/* Sidebar logo and branding spacing */
-.beans-sidebar-brand {
-  padding: 4px 10px 26px;
-}
-
-/* Align the brand name and subtitle */
-.beans-sidebar .app-branding {
-  position: static;
-  display: flex;
-  gap: 7px;
-  z-index: auto;
-}
-
-.beans-sidebar .brand-title {
-  color: var(--logo-color);
-  font-size: 21px;
-  letter-spacing: -.5px;
-  font-weight: 700;
-}
-
-.beans-sidebar .brand-subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.beans-sidebar .brand-subtitle a {
-  color: var(--text-muted);
-}
-
-/* Stack sidebar navigation buttons */
-.beans-sidebar-actions {
-  display: grid;
-  gap: 5px;
-}
-
-/* Base appearance of sidebar navigation buttons */
-.beans-nav-button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  min-height: 42px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--text-muted);
-  text-align: left;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 550;
-}
-
-/* Highlight hovered and currently selected navigation items */
-.beans-nav-button:hover,
-.beans-nav-button.active {
-  color: var(--text-main);
-  background: color-mix(in srgb, var(--accent) 11%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-/* Highlight the icon in the selected navigation item */
-.beans-nav-button.active .beans-nav-icon {
-  color: var(--accent);
-}
-
-/* Reserve a consistent area for each navigation icon */
-.beans-nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  color: var(--text-muted);
-  font-size: 18px;
-}
-
-/* Small count badge on a navigation item */
-.beans-nav-count {
-  margin-left: auto;
-  min-width: 18px;
-  text-align: center;
-  border-radius: 20px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  padding: 2px 6px;
-}
-
-/* Sidebar and drawer section headings */
-.beans-sidebar-section-head,
-.beans-drawer-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 25px 8px 10px;
-  color: var(--text-muted);
-  font-size: 9px;
-  letter-spacing: 1.3px;
-  font-weight: 750;
-}
-
-/* Small action buttons beside section headings */
-.beans-sidebar-section-head button,
-.beans-drawer-list-head button {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 10px;
-  letter-spacing: 0;
-}
-
-/* Accent color on section-heading action hover */
-.beans-sidebar-section-head button:hover,
-.beans-drawer-list-head button:hover {
-  color: var(--accent);
-}
-
-/* Scrollable list of previously entered URLs */
-.beans-url-list {
-  flex: 1;
-  min-height: 40px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-right: 2px;
-}
-
-/* Individual saved URL/history entry in the sidebar */
-.beans-url-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 100%;
-  padding: 10px 10px;
-  text-align: left;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-main);
-  cursor: pointer;
-}
-
-/* Highlight a saved URL when hovered */
-.beans-url-item:hover {
-  background: var(--bg-input);
-  border-color: var(--border);
-}
-
-/* Saved URL title: keep it on one line */
-.beans-url-item-title {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Saved URL address: truncate long URLs */
-.beans-url-item-url {
-  font-size: 10px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Additional metadata for sidebar URL entries */
-.beans-url-item-meta {
-  font-size: 10px;
-  color: var(--text-muted);
-  opacity: .8;
-}
-
-/* Empty-list placeholder */
-.beans-empty-state {
-  padding: 18px 10px;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.6;
-  text-align: center;
-}
-
-/* Keep sidebar settings and footer near the bottom */
-.beans-sidebar-bottom {
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.beans-chevron {
-  margin-left: auto;
-}
-
-/* Expanded settings content */
-.beans-settings-expand {
-  margin: 2px 8px 8px 42px;
-  padding: 10px;
-  border-left: 1px solid var(--border);
-}
-
-/* Hide settings content when collapsed */
-.beans-settings-expand[hidden] {
-  display: none;
-}
-
-.beans-settings-expand p {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.5;
-  margin-bottom: 8px;
-}
-
-.beans-settings-expand button {
-  color: var(--accent);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 650;
-}
-
-/* Theme-switch button in the sidebar */
-.beans-theme-button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 7px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg-input);
-  color: var(--text-muted);
-  font-size: 12px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.beans-theme-button #beans-theme-icon {
-  font-size: 16px;
-}
-
-/* Track and knob for the light/dark theme switch */
-.beans-theme-switch {
-  width: 29px;
-  height: 16px;
-  margin-left: auto;
-  padding: 2px;
-  border-radius: 99px;
-  background: var(--border);
-}
-
-.beans-theme-switch i {
-  display: block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  transition: transform .2s;
-}
-
-/* Change switch appearance when light mode is active */
-.beans-theme-button.is-light .beans-theme-switch {
-  background: var(--accent);
-}
-
-.beans-theme-button.is-light .beans-theme-switch i {
-  transform: translateX(13px);
-  background: white;
-}
-
-/* Sidebar footer and its secondary text */
-.beans-sidebar-footer {
-  padding: 17px 8px 0;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.beans-sidebar-footer span {
-  display: block;
-  margin-top: 3px;
-  opacity: .7;
-}
-
-/* ---------- 5. Main workspace and top navigation ---------- */
-
-/* Main content area beside the sidebar */
-.beans-workspace {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  overflow: auto;
-}
-
-/* Sticky header containing page title and Downloads button */
-.beans-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-  min-height: 76px;
-  padding: 14px 28px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-header);
-  backdrop-filter: blur(14px);
-}
-
-/* Small uppercase label above the page title */
-.beans-page-eyebrow {
-  margin-bottom: 4px;
-  color: var(--accent);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 1.6px;
-}
-
-.beans-page-title {
-  color: var(--text-main);
-  font-size: 19px;
-  font-weight: 650;
-  letter-spacing: -.3px;
-}
-
-/* Button that opens the download drawer */
-.beans-top-downloads {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 13px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
-  color: var(--text-main);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.beans-top-downloads span {
-  color: var(--accent);
-  font-size: 17px;
-}
-
-.beans-top-downloads:hover {
-  border-color: var(--accent);
-}
-
-/* Center the main extractor form in the workspace */
-.beans-workspace-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  padding: 28px;
-}
-
-/* Extractor form/card appearance inside the new workspace */
-.beans-workspace .extractor-card {
-  width: 100%;
-  max-width: 660px;
-  margin: 0;
-  padding: 30px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  box-shadow: var(--card-shadow);
-  border-radius: 15px;
-}
-
-.beans-workspace .input-group {
-  gap: 12px;
-}
-
-/* Theme-aware input and preview backgrounds */
-.beans-workspace input[type="text"] {
-  background: var(--bg-input);
-  color: var(--text-main);
-  border-color: var(--border);
-}
-
-.beans-workspace .preview-box,
-.beans-workspace .carousel-viewport {
-  background: var(--bg-input);
-}
-
-/* Theme-aware format-selection buttons */
-.beans-workspace .pill-btn {
-  color: var(--text-main);
-  background: var(--bg-input);
-  border-color: var(--border);
-}
-
-.beans-workspace .pill-btn.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-.beans-workspace .pill-btn.audio {
-  color: var(--accent);
-}
-
-.beans-workspace .pill-btn.audio.active {
-  color: #fff;
-}
-
-.beans-workspace .btn-secondary {
-  color: var(--text-muted);
-}
-
-/* ---------- 6. Download drawer and overlay ---------- */
-
-/* Slide-in panel on the right side of the app */
-.beans-download-drawer {
-  position: fixed;
-  z-index: 1200;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(460px, 94vw);
-  display: flex;
-  flex-direction: column;
-  padding: 22px;
-  background: var(--bg-card);
-  border-left: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  transform: translateX(105%);
-  transition: transform .25s ease;
-  overflow: hidden;
-  opacity: 100;
-}
-
-/* Show the drawer by sliding it into view */
-.beans-download-drawer.open {
-  transform: translateX(0);
-}
-
-/* Dark overlay behind the open drawer */
-.beans-drawer-scrim {
-  position: fixed;
-  z-index: 1190;
-  inset: 0;
-  background: rgba(0,0,0,.42);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .2s;
-}
-
-/* Activate the overlay when the drawer is open */
-.beans-drawer-scrim.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Drawer title row */
-.beans-drawer-header h2 {
-  font-size: 23px;
-  font-weight: 700;
-  letter-spacing: -.5px;
-}
-
-/* Drawer close button */
-.beans-drawer-header > button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 24px;
-  cursor: pointer;
-}
-
-/* Hide the active-download section when it has no content */
-.beans-download-active:empty {
-  display: none;
-}
-
-/* ---------- 7. Active download card and progress bar ---------- */
-
-/* Card for a download currently running or queued */
-.beans-active-card {
-  margin-top: 17px;
-  padding: 15px;
-  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--accent) 7%, var(--bg-card));
-}
-
-/* Small status row above the active download title */
-.beans-active-top {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--accent);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 1.1px;
-}
-
-/* Keep the percentage at the far right of the status row */
-.beans-active-percent {
-  margin-left: auto;
-  color: var(--text-main);
-  font-size: 11px;
-  letter-spacing: 0;
-}
-
-/* Green dot indicating an active status */
-.beans-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 15%, transparent);
-}
-
-/* Shared title style for active and historical downloads */
-.beans-download-title {
-  color: var(--text-main);
-  font-size: 13px;
-  line-height: 1.45;
-  font-weight: 650;
-  overflow-wrap: anywhere;
-}
-
-/* Space between the active status row and title */
-.beans-active-card .beans-download-title {
-  margin-top: 12px;
-}
-
-/* Background track for the download progress indicator */
-.beans-progress-track {
-  height: 5px;
-  margin-top: 12px;
-  overflow: hidden;
-  border-radius: 99px;
-  background: var(--border);
-}
-
-/* Filled portion of the progress bar */
-.beans-progress-track i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  border-radius: inherit;
-  transition: width .2s;
-}
-
-/* Active download footer: details on the left, cancel on the right */
-.beans-active-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 10px;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.beans-active-bottom button {
-  color: var(--error-text);
-  border: 0;
-  background: transparent;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-/* ---------- 8. Download history list and cards ---------- */
-
-/* Heading above the history list */
-.beans-drawer-list-head {
-  margin: 23px 0 12px;
-}
-
-/* Scrollable stack of download history entries */
-.beans-download-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 1px 2px 10px 1px;
-}
-
-/* Base history card: icon on the left, details on the right */
-.beans-download-item {
-  display: flex;
-  gap: 11px;
-  padding: 13px 11px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: var(--bg-main);
-}
-
-/* Status icon container shared by completed, failed, and active entries */
-.beans-download-item-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 31px;
-  height: 31px;
-  flex: 0 0 31px;
-  border-radius: 9px;
-  background: var(--border);
-  color: var(--text-muted);
-  font-weight: 800;
-}
-
-/* Green completion/check icon */
-.beans-download-item-icon.success {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-}
-
-/* Red icon for failed or cancelled downloads */
-.beans-download-item-icon.danger {
-  color: var(--error-text);
-  background: var(--error-bg);
-}
-
-/* Orange icon for active downloads */
-.beans-download-item-icon.active {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-/* Allow the card's text area to shrink without overflowing */
-.beans-download-item-body {
-  min-width: 0;
-  flex: 1;
-}
-
-/* Small space beneath the title in a history card */
-.beans-download-item-body > .beans-download-title {
-  margin-bottom: 5px;
-}
-
-/* Secondary metadata, such as file details or media information */
-.beans-download-item-meta {
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-/* Footer row containing status, date, or other compact details */
-.beans-download-item-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 9px;
-  color: var(--text-muted);
-  font-size: 9px;
-}
-
-/* Base badge for download status */
-.beans-status-pill {
-  display: inline-block;
-  padding: 3px 7px;
-  border-radius: 5px;
-  background: var(--border);
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 650;
-}
-
-/* Green completed badge */
-.beans-status-pill.success {
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-}
-
-/* Red failure badge */
-.beans-status-pill.danger {
-  color: var(--error-text);
-  background: var(--error-bg);
-}
-
-/* Orange active/queued badge */
-.beans-status-pill.active {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-/* Error and explanatory text beneath history entries */
+  color-scheme: light;
+  --bg-main: #fafafa; --bg-card: #fff; --bg-header: rgba(248, 248, 248, .85); --bg-input: #f2f2f4;
+  --accent: #d97706; --accent-hover: #b45309;
+  --text-main: #0f172a; --text-muted: #64748b; --border: #e6e6ea; --logo-color: #0f172a;
+  --success: #059669;
+  --shadow: 0 20px 40px rgba(15, 23, 42, .08); --card-shadow: 0 4px 20px rgba(15, 23, 42, .05);
+  --error-bg: rgba(239, 68, 68, .08); --error-border: rgba(239, 68, 68, .25); --error-text: #dc2626;
+  --hover-accent: rgba(180, 83, 9, .12);
+}
+/* Derived tokens: work in both themes (replaces hard-coded white alphas / accent rgba) */
+:root,
+[data-theme="light"] {
+  --ctrl-bg: color-mix(in srgb, var(--text-main) 5%, transparent);
+  --ctrl-bg-hover: color-mix(in srgb, var(--text-main) 9%, transparent);
+  --accent-tint: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-tint-strong: color-mix(in srgb, var(--accent) 24%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ---------- Application shell ---------- */
+.beans-app-shell { position: fixed; inset: 0; display: flex; overflow: hidden; background: radial-gradient(1100px 520px at 62% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%), var(--bg-main); color: var(--text-main); }
+
+/* ---------- Sidebar ---------- */
+.beans-sidebar { display: flex; flex: 0 0 72px; flex-direction: column; width: 72px; min-width: 72px; min-height: 0; overflow: hidden; padding: 16px 10px 10px; border-right: 1px solid color-mix(in srgb, var(--text-main) 8%, transparent); background: color-mix(in srgb, var(--bg-card) 68%, transparent); -webkit-backdrop-filter: blur(30px) saturate(1.5); backdrop-filter: blur(30px) saturate(1.5); white-space: nowrap; z-index: 2; transition: width .35s cubic-bezier(.32, .72, 0, 1), flex-basis .35s cubic-bezier(.32, .72, 0, 1); }
+.beans-app-shell.sidebar-expanded .beans-sidebar { flex-basis: 240px; width: 240px; min-width: 240px; }
+.beans-sidebar-actions { display: grid; gap: 5px; }
+.beans-nav-button { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 40px; padding: 9px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--text-muted); text-align: left; font-size: 14px; font-weight: 500; letter-spacing: -.01em; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.beans-nav-button:hover { background: var(--ctrl-bg); color: var(--text-main); }
+.beans-nav-button.active { background: var(--ctrl-bg-hover); color: var(--text-main); }
+/* icon box now matches the 22px svg inside it */
+.beans-nav-icon { display: inline-flex; flex: 0 0 22px; align-items: center; justify-content: center; width: 22px; color: currentColor; font-size: 18px; }
+.beans-nav-icon svg { display: block; width: 22px; height: 22px; stroke-width: 1.6; }
+.beans-nav-label { display: none; min-width: 0; }
+.beans-app-shell.sidebar-expanded .beans-nav-label { display: inline-block; }
+.beans-nav-count { position: absolute; top: 6px; right: 6px; display: none; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 99px; background: var(--accent); color: #000; text-align: center; font-size: 9px; font-weight: 700; line-height: 16px; }
+.beans-nav-count:not(:empty) { display: inline-block; }
+.beans-app-shell.sidebar-expanded .beans-nav-count { right: 8px; }
+
+/* Sidebar hamburger */
+.beans-menu-toggle { display: flex; flex: 0 0 40px; align-items: center; justify-content: center; width: 40px; min-width: 40px; height: 40px; min-height: 40px; max-width: 40px; max-height: 40px; margin: 0 0 24px; padding: 0; aspect-ratio: 1; border-radius: 50%; }
+.beans-menu-toggle .beans-nav-icon { flex: 0 0 auto; width: auto; margin: 0; }
+.beans-menu-toggle svg { width: 26px; height: 26px; }
+
+.beans-sidebar-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-bottom: 12px; color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .5px; }
+.beans-sidebar-section-head button { flex: 0 0 auto; margin-left: auto; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
+.beans-sidebar-section-head button:hover { background: var(--hover-accent); color: var(--text-main); }
+
+/* URL history: hidden unless sidebar is expanded and history is active */
+.beans-sidebar-history-wrapper { display: none; }
+.beans-app-shell.sidebar-expanded.history-active .beans-sidebar-history-wrapper { display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0; margin-top: 14px; padding: 0 4px; overflow: hidden; }
+.beans-url-list { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 40px; gap: 6px; padding-right: 2px; overflow-y: auto; }
+.beans-url-item { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-main); text-align: left; cursor: pointer; }
+.beans-url-item:hover { border-color: var(--border); background: var(--bg-input); }
+.beans-url-item-title,
+.beans-url-item-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.beans-url-item-title { font-size: 12px; font-weight: 600; }
+.beans-url-item-url,
+.beans-url-item-meta { color: var(--text-muted); font-size: 10px; }
+.beans-url-item-meta { opacity: .8; }
+.beans-empty-state { padding: 18px 10px; color: var(--text-muted); font-size: 11px; line-height: 1.6; text-align: center; }
+
+/* Sidebar settings / footer */
+.beans-sidebar-bottom { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); }
+.beans-chevron { margin-left: auto; }
+.beans-sidebar-footer { padding: 17px 8px 0; color: var(--text-muted); font-size: 10px; }
+.beans-sidebar-footer span { display: block; margin-top: 3px; opacity: .7; }
+
+/* ---------- Workspace and top bar ---------- */
+.beans-workspace { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; overflow: auto; }
+.beans-topbar { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; min-height: 56px; padding: 12px 24px; background: transparent; }
+.beans-page-eyebrow { margin-bottom: 4px; color: var(--accent); font-size: 9px; font-weight: 750; letter-spacing: 1.6px; }
+.beans-page-title { color: var(--text-main); font-size: 19px; font-weight: 650; letter-spacing: -.3px; }
+.beans-top-downloads { display: flex; align-items: center; justify-content: center; margin-left: auto; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; transition: background .15s, color .15s; }
+.beans-top-downloads:hover { background: var(--ctrl-bg-hover); color: var(--text-main); }
+.beans-top-downloads svg { display: block; width: 22px; height: 22px; }
+.beans-workspace-content { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; min-height: 0; padding: 28px; }
+
+/* ---------- Downloads drawer (floating sheet) ---------- */
+.beans-drawer-scrim { position: fixed; inset: 0; z-index: 1190; background: rgba(0, 0, 0, .3); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+.beans-drawer-scrim.visible { opacity: 1; pointer-events: auto; }
+.beans-download-drawer { position: fixed; top: 10px; right: 10px; bottom: 10px; z-index: 1200; display: flex; flex-direction: column; width: min(420px, calc(100vw - 20px)); padding: 22px 18px 14px; overflow: hidden; transform: translateX(calc(100% + 24px)); border: 1px solid color-mix(in srgb, var(--text-main) 8%, transparent); border-radius: 22px; background: color-mix(in srgb, var(--bg-card) 84%, transparent); -webkit-backdrop-filter: blur(40px) saturate(1.6); backdrop-filter: blur(40px) saturate(1.6); box-shadow: var(--shadow); transition: transform .4s cubic-bezier(.32, .72, 0, 1); }
+.beans-download-drawer.open { transform: translateX(0); }
+.beans-drawer-header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 0 4px; }
+.beans-drawer-header h2 { margin: 0; color: var(--text-main); font-size: 20px; font-weight: 650; letter-spacing: -.02em; }
+
+/* Circular close buttons (drawer + settings) */
+.beans-modal-close { display: flex; flex: 0 0 30px; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: var(--ctrl-bg-hover); color: var(--text-muted); cursor: pointer; transition: background .15s, color .15s; }
+.beans-modal-close:hover { background: color-mix(in srgb, var(--text-main) 16%, transparent); color: var(--text-main); }
+.beans-modal-close svg { width: 14px; height: 14px; stroke: currentColor; }
+
+/* Active download */
+.beans-download-active { display: flex; flex: 0 0 auto; flex-direction: column; gap: 10px; }
+.beans-download-active:empty { display: none; }
+.beans-active-card { margin-top: 18px; padding: 14px 16px; border-radius: 16px; background: var(--ctrl-bg-hover); }
+.beans-active-top { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .06em; }
+.beans-active-percent { margin-left: auto; color: var(--text-main); font-size: 12px; font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.beans-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+.beans-download-title { overflow-wrap: anywhere; color: var(--text-main); font-size: 14px; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; }
+.beans-active-card .beans-download-title { margin: 8px 0 12px; }
+.beans-progress-track { height: 4px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--text-main) 12%, transparent); }
+.beans-progress-track i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
+.beans-active-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; color: var(--text-muted); font-size: 12px; }
+.beans-active-bottom button { padding: 4px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer; transition: background .15s, color .15s; }
+.beans-active-bottom button:hover:not(:disabled) { background: var(--error-bg); color: var(--error-text); }
+.beans-active-bottom button:disabled { opacity: .5; cursor: default; }
+
+/* Finished downloads: one grouped list, rows split by hairlines */
+.beans-download-list { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin-top: 18px; padding-bottom: 10px; overflow-y: auto; }
+.beans-download-item { display: flex; flex: 0 0 auto; gap: 12px; padding: 13px 14px; background: var(--ctrl-bg); }
+.beans-download-item:first-child { border-radius: 16px 16px 0 0; }
+.beans-download-item:last-child { border-radius: 0 0 16px 16px; }
+.beans-download-item:only-child { border-radius: 16px; }
+.beans-download-item + .beans-download-item { border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+.beans-download-item-icon { display: flex; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: var(--ctrl-bg-hover); color: var(--text-muted); font-size: 14px; font-weight: 700; }
+.beans-download-item-icon.success { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.beans-download-item-icon.danger { background: var(--error-bg); color: var(--error-text); }
+.beans-download-item-icon.active { background: var(--accent-tint); color: var(--accent); }
+.beans-download-item-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
+.beans-download-item .beans-download-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.beans-download-item-meta { overflow-wrap: anywhere; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+.beans-download-item-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; color: var(--text-muted); font-size: 11px; }
+.beans-status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--ctrl-bg-hover); color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.beans-status-pill:empty { display: none; }
+.beans-status-pill.success { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.beans-status-pill.danger { background: var(--error-bg); color: var(--error-text); }
+.beans-status-pill.active { background: var(--accent-tint); color: var(--accent); }
 .beans-download-error,
-.beans-download-note {
-  margin-top: 8px;
-  font-size: 10px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
+.beans-download-note { margin-top: 4px; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }
+.beans-download-error { color: var(--error-text); }
+.beans-download-note { color: var(--text-muted); }
+.beans-download-actions { display: flex; gap: 6px; margin-top: 6px; }
+.beans-download-actions button { padding: 5px 12px; border: 0; border-radius: 999px; background: var(--ctrl-bg-hover); color: var(--text-main); font-size: 12px; font-weight: 500; cursor: pointer; transition: background .15s; }
+.beans-download-actions button:hover { background: color-mix(in srgb, var(--text-main) 16%, transparent); }
+.beans-cc-badge { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; padding: 1px 5px; border-radius: 4px; background: var(--ctrl-bg-hover); color: var(--text-muted); font-size: 9px; font-weight: 700; line-height: 1.4; letter-spacing: .04em; }
 
-/* Error message styling */
-.beans-download-error {
-  color: var(--error-text);
-}
+/* Drawer footer: tooltip + Clear all */
+.beans-drawer-list-head { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: auto; padding: 12px 2px 0; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+#beans-clear-downloads { flex: 0 0 auto; margin-left: auto; padding: 6px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background .15s, color .15s; }
+#beans-clear-downloads:hover { background: var(--ctrl-bg-hover); color: var(--text-main); }
 
-/* General informational message styling */
-.beans-download-note {
-  color: var(--text-muted);
-}
-
-/* Buttons such as Show file and Try again */
-.beans-download-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 9px;
-}
-
-.beans-download-actions button {
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--accent);
-  font-size: 10px;
-  cursor: pointer;
-}
-
-/* Highlight action buttons on hover */
-.beans-download-actions button:hover {
-  border-color: var(--accent);
-}
-
-/* Informational note at the bottom of the history drawer */
-.beans-history-note {
-  padding-top: 13px;
-  border-top: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-/* ---------- 9. Settings modal theme adjustments ---------- */
-
-/* Keep the settings modal above the drawer */
-#settings-modal {
-  z-index: 1300 !important;
-}
-
-/* Apply the app theme to the settings modal */
-#settings-modal .settings-modal-content {
-  background: var(--bg-card) !important;
-  color: var(--text-main) !important;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow) !important;
-}
-
-#settings-modal label,
-#settings-modal strong {
-  color: var(--text-main) !important;
-}
-
-#settings-modal input[type="text"],
-#settings-modal select {
-  background: var(--bg-input) !important;
-  color: var(--text-main) !important;
-  border-color: var(--border) !important;
-}
-
-/* Replace selected hard-coded modal backgrounds with theme colors */
-#settings-modal [style*="background: #252538"],
-#settings-modal [style*="background: #2a2a3d"] {
-  background: var(--bg-input) !important;
-}
-
-/* Replace selected hard-coded modal text colors with theme colors */
-#settings-modal [style*="color: #ccc"],
-#settings-modal [style*="color: #aaa"] {
-  color: var(--text-muted) !important;
-}
-
-/* Theme-aware borders and subtitle-language selector */
-#subtitle-settings-block {
-  border-color: var(--border) !important;
-}
-
-#settings-subtitle-language {
-  background: var(--bg-input) !important;
-  color: var(--text-main) !important;
-  border-color: var(--border) !important;
-}
-
-/* ---------- 10. Responsive layout for narrower windows ---------- */
-@media (max-width: 760px) {
-  /* Compress the sidebar into an icon rail */
-  .beans-sidebar {
-    width: 70px;
-    flex-basis: 70px;
-    padding: 16px 8px 10px;
-  }
-
-  .beans-sidebar-brand {
-    padding: 4px 2px 20px;
-  }
-
-  /* Hide the full brand title and show a short replacement */
-  .beans-sidebar .brand-title {
-    font-size: 0;
-  }
-
-  .beans-sidebar .brand-title::after {
-    content: 'BE';
-    font-size: 18px;
-    color: var(--accent);
-  }
-
-  /* Hide labels and secondary sidebar content on narrow screens */
-  .beans-sidebar .brand-subtitle,
-  .beans-nav-button > span:not(.beans-nav-icon),
-  .beans-sidebar-section-head,
-  .beans-url-list,
-  .beans-sidebar-footer,
-  .beans-settings-expand,
-  .beans-theme-button > span:not(#beans-theme-icon):not(.beans-theme-switch) {
-    display: none !important;
-  }
-
-  /* Center icons in the compressed navigation */
-  .beans-nav-button {
-    justify-content: center;
-    padding: 10px 0;
-  }
-
-  .beans-nav-icon {
-    width: auto;
-    font-size: 20px;
-  }
-
-  .beans-theme-button {
-    justify-content: center;
-    padding: 9px 0;
-  }
-
-  .beans-theme-switch {
-    display: none;
-  }
-
-  /* Reduce header height and horizontal padding */
-  .beans-topbar {
-    min-height: 64px;
-    padding: 12px 16px;
-  }
-
-  /* Align the extractor form toward the top on small screens */
-  .beans-workspace-content {
-    padding: 16px;
-    align-items: flex-start;
-  }
-
-  .beans-workspace .extractor-card {
-    padding: 18px;
-    margin-top: 8px;
-  }
-}
-
-/* Additional adjustments for very narrow screens */
-@media (max-width: 420px) {
-  /* Keep the Downloads button compact */
-  .beans-top-downloads {
-    padding: 8px;
-    font-size: 0;
-  }
-
-  .beans-top-downloads span {
-    font-size: 17px;
-  }
-
-  /* Reduce drawer padding to gain usable space */
-  .beans-download-drawer {
-    padding: 16px;
-  }
-}
-
+/* Information tooltip */
+.beans-info-tooltip { position: relative; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 6px; color: var(--text-muted); cursor: help; }
+.beans-info-tooltip:hover,
+.beans-info-tooltip:focus-visible { background: var(--ctrl-bg-hover); color: var(--text-main); }
+.beans-tooltip-text { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 10; visibility: hidden; padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); box-shadow: 0 8px 20px rgba(0, 0, 0, .35); color: var(--text-main); font-size: 12px; font-weight: 400; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.beans-info-tooltip:hover .beans-tooltip-text,
+.beans-info-tooltip:focus-visible .beans-tooltip-text { visibility: visible; opacity: 1; }
 
 /* =========================================================
-   11. COMPACT DOWNLOAD REFINEMENT — VERSION 1
-   These rules apply only when the matching HTML element
-   includes the "compact-download-item" class.
+   SETTINGS  (sheet with grouped rows; JS toggles display on #settings-modal)
    ========================================================= */
+#settings-modal { position: fixed; inset: 0; z-index: 1300; display: none; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 20px; overflow-y: auto; background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
+#settings-modal > div { box-sizing: border-box; }
+#settings-modal .beans-modal-content { position: relative; z-index: 1301; display: flex; flex-direction: column; width: min(560px, 94vw); height: min(700px, 94vh); padding: 26px 28px 22px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--text-main) 8%, transparent); border-radius: 24px; background: var(--bg-card); box-shadow: var(--shadow); color: var(--text-main); }
 
-/* Reduce padding and spacing inside a compact history card */
-.compact-download-item {
-  padding: 10px 12px !important;
-  gap: 10px !important;
+.beans-modal-header,
+.beans-settings-tabs,
+.beans-settings-actions { flex-shrink: 0; }
+.beans-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.beans-modal-header h3 { margin: 0; color: var(--text-main); font-size: 1.3rem; font-weight: 650; letter-spacing: -.02em; }
+
+#settings-modal label,
+#settings-modal strong { color: var(--text-main); }
+#settings-modal input[type="text"],
+#settings-modal select { border: 1px solid transparent; border-radius: 12px; background: var(--bg-input); color: var(--text-main); outline: none; transition: border-color .15s, box-shadow .15s; }
+#settings-modal input[type="text"]:focus,
+#settings-modal select:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-tint); }
+
+/* Segmented control */
+.beans-settings-tabs { display: flex; gap: 2px; padding: 3px; margin-bottom: 20px; border-radius: 11px; background: var(--ctrl-bg-hover); }
+.beans-tab-btn { flex: 1; padding: 7px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); font-size: .88rem; font-weight: 500; cursor: pointer; transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+.beans-tab-btn:hover { color: var(--text-main); }
+.beans-tab-btn.active { background: color-mix(in srgb, var(--text-main) 14%, var(--bg-card)); color: var(--text-main); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+[data-theme="light"] .beans-tab-btn.active { background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
+
+/* Panels */
+.beans-tab-panel { display: none; flex: 1; flex-direction: column; gap: 18px; min-height: 0; padding: 2px 2px 0 0; overflow-y: auto; }
+.beans-tab-panel.active { display: flex; animation: beansFadeIn .18s ease-out; }
+@keyframes beansFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Fields: small caption above a rounded control */
+.beans-settings-field { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.beans-settings-field > label { display: block; padding-left: 4px; color: var(--text-muted) !important; font-size: .78rem; font-weight: 500; letter-spacing: .01em; }
+.beans-settings-inline { display: flex; align-items: stretch; gap: 8px; }
+.beans-settings-inline input { flex: 1; min-width: 0; padding: 12px 14px; font-size: .92rem; }
+.beans-field-hint { padding-left: 4px; color: var(--text-muted); font-size: .75rem; line-height: 1.4; }
+.beans-settings-button { padding: 9px 16px; border: 0; border-radius: 999px; background: var(--ctrl-bg-hover); color: var(--text-main); font-size: .85rem; font-weight: 500; cursor: pointer; transition: background .15s; }
+.beans-settings-button:hover { background: color-mix(in srgb, var(--text-main) 16%, transparent); }
+.beans-settings-help { padding: 12px 14px; border-radius: 14px; background: var(--ctrl-bg); color: var(--text-muted); font-size: .8rem; line-height: 1.5; }
+.beans-settings-divider { margin: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+#setting-cookies-file { max-width: 100%; color: var(--text-muted); font-size: .85rem; }
+.beans-cookies-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--ctrl-bg); }
+#cookie-upload-status { padding-left: 4px; font-size: .8rem; }
+
+.beans-icon-button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 44px; border: 0; border-radius: 12px; background: var(--bg-input); color: var(--text-muted); cursor: pointer; transition: background .15s, color .15s; }
+.beans-icon-button:hover { background: var(--accent-tint); color: var(--accent); }
+
+/* iOS-style switch (shared by theme + subtitles) */
+.beans-theme-switch,
+.me-subtitle-switch { position: relative; display: inline-block; flex: 0 0 46px; width: 46px; height: 28px; }
+.beans-theme-switch { border-radius: 999px; background: var(--accent); transition: background .25s ease; }
+.beans-theme-switch i { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .3); transform: translateX(18px); transition: transform .25s cubic-bezier(.32, .72, 0, 1); }
+[data-theme="light"] .beans-theme-switch { background: color-mix(in srgb, var(--text-muted) 45%, transparent); }
+[data-theme="light"] .beans-theme-switch i { transform: translateX(0); }
+.me-subtitle-switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.me-subtitle-slider { position: absolute; inset: 0; border-radius: 999px; background: color-mix(in srgb, var(--text-muted) 45%, transparent); cursor: pointer; transition: background .25s ease; }
+.me-subtitle-slider::before { content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .3); transition: transform .25s cubic-bezier(.32, .72, 0, 1); }
+.me-subtitle-switch input:checked + .me-subtitle-slider { background: var(--accent); }
+.me-subtitle-switch input:checked + .me-subtitle-slider::before { transform: translateX(18px); }
+.me-subtitle-switch input:focus-visible + .me-subtitle-slider { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Appearance row */
+.beans-theme-switcher { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--ctrl-bg); color: inherit; cursor: pointer; transition: background .15s ease; }
+.beans-theme-switcher:hover { background: var(--ctrl-bg-hover); }
+.beans-theme-left { display: flex; align-items: center; gap: 12px; text-align: left; }
+.beans-theme-icon-box { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: var(--ctrl-bg-hover); color: var(--text-main); font-size: 1rem; }
+.beans-theme-text { display: flex; flex-direction: column; gap: 2px; }
+.beans-theme-text strong { font-size: .9rem; font-weight: 600; }
+.beans-theme-text small { color: var(--text-muted); font-size: .76rem; }
+
+/* Subtitles */
+#subtitle-settings-block { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; border-radius: 14px; background: var(--ctrl-bg); }
+.me-subtitle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.me-subtitle-title { margin-bottom: 3px; font-size: .9rem; font-weight: 600; }
+.me-subtitle-help { color: var(--text-muted); font-size: .78rem; line-height: 1.4; }
+.me-subtitle-language { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+.me-subtitle-language label { color: var(--text-muted) !important; font-size: .78rem; font-weight: 500; }
+#settings-subtitle-language { width: 100%; padding: 10px 12px; }
+
+/* About */
+.beans-about-card { padding: 16px; border-radius: 16px; background: var(--ctrl-bg); }
+.beans-about-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.beans-app-name { margin: 0; color: var(--text-main); font-size: 1rem; font-weight: 650; letter-spacing: -.01em; }
+.beans-app-tagline { margin: 2px 0 0; color: var(--text-muted); font-size: .8rem; }
+.beans-version-badge { padding: 3px 10px; border-radius: 999px; background: var(--ctrl-bg-hover); color: var(--text-muted); font-size: .75rem; font-weight: 600; }
+.beans-about-meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; padding: 12px 0; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); font-size: .85rem; }
+.beans-meta-row { display: flex; justify-content: space-between; color: var(--text-muted); }
+.beans-meta-row strong,
+.beans-meta-row span:last-child { color: var(--text-main); }
+.beans-about-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.beans-link-pill { flex: 1 1 auto; padding: 8px 12px; border-radius: 999px; background: var(--ctrl-bg-hover); color: var(--text-main); text-align: center; text-decoration: none; font-size: .8rem; font-weight: 500; transition: background .15s; }
+.beans-link-pill:hover { background: color-mix(in srgb, var(--text-main) 16%, transparent); }
+
+.beans-modal-error { flex-shrink: 0; margin-bottom: 14px; padding: 10px 14px; border-radius: 12px; background: var(--error-bg); color: var(--error-text); font-size: .85rem; }
+.beans-modal-error[hidden] { display: none; }
+
+/* Footer: quiet Cancel, one accent Save */
+.beans-settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+.beans-settings-actions .beans-settings-button { height: 40px; padding: 0 20px; }
+#settings-save-btn { height: 40px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-size: .9rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+#settings-save-btn:hover { background: var(--accent-hover); }
+#settings-save-btn:disabled { opacity: .5; cursor: default; }
+
+/* =========================================================
+   RESPONSIVE — must stay LAST so it overrides the base rules
+   ========================================================= */
+@media (max-width: 760px) {
+  .beans-topbar { min-height: 56px; padding: 12px 16px; }
+  .beans-workspace-content { align-items: flex-start; padding: 16px; }
+  #settings-modal .beans-modal-content { padding: 22px; }
 }
-
-/* Tighten the layout of the card's details area */
-.compact-download-item .beans-download-item-body {
-  gap: 4px !important;
-  min-width: 0;
-}
-
-/* Align the title and any small inline badge, such as CC */
-.compact-download-item .beans-download-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  line-height: 1.35;
-}
-
-/* Keep metadata close to the title and slightly compact */
-.compact-download-item .beans-download-item-meta {
-  margin-top: 0 !important;
-  font-size: 11px;
-}
-
-/* Reduce the gap above the footer row */
-.compact-download-item .beans-download-item-footer {
-  margin-top: 3px !important;
-}
-
-/* Hide empty status badges so they don't occupy space */
-.compact-download-item .beans-status-pill:empty {
-  display: none;
-}
-
-/* Reduce the gap above Show file / Try again actions */
-.compact-download-item .beans-download-actions {
-  margin-top: 4px !important;
-}
-
-/* Small CC badge for indicating embedded subtitles */
-.beans-cc-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  padding: 2px 5px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: .04em;
-}
-
-/* Reduce the active-download card's overall padding */
-.beans-active-card {
-  padding: 12px 14px !important;
-}
-
-/* Reduce the gap above and below the active download title */
-.beans-active-card .beans-download-title {
-  margin: 5px 0 8px !important;
-  line-height: 1.35;
-}
-
-/* Bring the active download footer closer to the progress bar */
-.beans-active-card .beans-active-bottom {
-  margin-top: 7px !important;
+@media (max-width: 420px) {
+  .beans-app-shell.sidebar-expanded .beans-sidebar { flex-basis: 210px; width: 210px; min-width: 210px; }
+  .beans-download-drawer { top: 6px; right: 6px; bottom: 6px; width: calc(100vw - 12px); padding: 16px 14px 12px; }
+  .beans-drawer-header h2 { font-size: 20px; }
+  .beans-workspace-content { padding: 12px; }
+  #settings-modal { padding: 12px; }
+  #settings-modal .beans-modal-content { width: 100%; height: calc(100vh - 24px); padding: 18px; }
+  .beans-tooltip-text { max-width: 75vw; white-space: normal; }
 }

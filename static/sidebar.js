@@ -4,6 +4,14 @@
 
   const $ = id => document.getElementById(id);
 
+  // One definition of "finished" for the whole file ('error' is accepted for older records).
+  const TERMINAL = ['completed', 'failed', 'error', 'cancelled', 'interrupted'];
+  const FAILED = ['failed', 'error'];
+  const RETRYABLE = ['failed', 'error', 'cancelled', 'interrupted'];
+
+  const statusOf = item => String(item?.status || 'starting').toLowerCase();
+  const isTerminal = item => TERMINAL.includes(statusOf(item));
+
   const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;',
     '"': '&quot;', "'": '&#39;'
@@ -50,9 +58,29 @@
   };
 
   let downloadsTimer = null;
-  let historyRefreshTimer = null;
 
-  // Connect the existing HTML elements.
+  /* ---------- Settings tabs ---------- */
+
+  function switchSettingsTab(tabName, btnElement) {
+    const modal = $('settings-modal');
+    if (!modal) return;
+
+    modal.querySelectorAll('.beans-tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-selected', 'false');
+    });
+
+    if (btnElement) {
+      btnElement.classList.add('active');
+      btnElement.setAttribute('aria-selected', 'true');
+    }
+
+    modal.querySelectorAll('.beans-tab-panel').forEach(panel => panel.classList.remove('active'));
+    $(`tab-${tabName}`)?.classList.add('active');
+  }
+
+  /* ---------- Shell wiring ---------- */
+
   function initializeSidebar() {
     const shell = $('beans-app-shell');
     if (!shell) {
@@ -60,18 +88,11 @@
       return;
     }
 
-    // Move existing application branding into the sidebar.
-    const brand = document.querySelector('.app-branding');
-    const brandTarget = shell.querySelector('.beans-sidebar-brand');
+    $('beans-sidebar-toggle')?.addEventListener('click', () => {
+      shell.classList.toggle('sidebar-expanded');
+    });
 
-    if (brand && brandTarget && !brandTarget.contains(brand)) {
-      brandTarget.appendChild(brand);
-    }
-
-    // The sidebar replaces the old hamburger menu.
-    $('menuToggle')?.remove();
-
-    // Move the existing extractor card into the workspace.
+    // Move the extractor card (and its error banner) into the workspace.
     const card = document.querySelector('.extractor-card');
     const workspace = shell.querySelector('.beans-workspace-content');
 
@@ -79,16 +100,11 @@
       workspace.appendChild(card);
     }
 
-    // Keep the error banner inside the extractor card.
-    const error = $('error-banner');
-
-    if (error && card && !card.contains(error)) {
-      card.prepend(error);
-    }
-
     $('beans-home-button')?.addEventListener('click', showHome);
 
     $('beans-url-history-button')?.addEventListener('click', () => {
+      shell.classList.add('sidebar-expanded');
+      shell.classList.toggle('history-active');
       showHome();
       $('url-input')?.focus();
       refreshUrlHistory();
@@ -99,9 +115,9 @@
     $('beans-close-drawer')?.addEventListener('click', closeDrawer);
     $('beans-drawer-scrim')?.addEventListener('click', closeDrawer);
 
-    $('beans-settings-button')?.addEventListener('click', toggleSettingsExpand);
-
-    $('beans-open-settings')?.addEventListener('click', () => {
+    $('beans-settings-button')?.addEventListener('click', () => {
+      shell.classList.add('sidebar-expanded');
+      shell.classList.remove('history-active');
       if (typeof window.openSettingsModal === 'function') {
         window.openSettingsModal();
       }
@@ -112,38 +128,29 @@
     $('beans-clear-downloads')?.addEventListener('click', clearDownloadHistory);
 
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closeDrawer();
+      if (event.key !== 'Escape') return;
+      if ($('settings-modal')?.style.display === 'flex') window.closeSettingsModal?.();
+      else closeDrawer();
     });
   }
 
   function showHome() {
-    $('beans-page-title').textContent = 'Home';
     $('beans-home-button')?.classList.add('active');
+    $('beans-home-button')?.setAttribute('aria-current', 'page');
     $('beans-url-history-button')?.classList.remove('active');
     closeDrawer();
   }
 
-  function toggleSettingsExpand() {
-    const panel = $('beans-settings-expand');
-    if (!panel) return;
+  /* ---------- Theme ---------- */
 
-    panel.hidden = !panel.hidden;
-
-    const chevron = $('beans-settings-chevron');
-    if (chevron) {
-      chevron.textContent = panel.hidden ? '⌄' : '⌃';
-    }
-  }
-
-  // Theme
   async function loadTheme() {
-    let theme = 'dark';
+    let theme = document.documentElement.getAttribute('data-theme') || 'dark';
 
     try {
       const data = await safeFetch('/api/theme', { cache: 'no-store' });
-      theme = data.theme || 'dark';
+      theme = data.theme || theme;
     } catch {
-      // Use dark mode if the saved preference cannot be loaded.
+      // Keep the theme the server rendered into the page.
     }
 
     applyTheme(theme, false);
@@ -160,8 +167,6 @@
     if (icon) icon.textContent = selected === 'dark' ? '☾' : '☀';
     if (label) label.textContent = selected === 'dark' ? 'Dark mode' : 'Light mode';
 
-    $('beans-theme-toggle')?.classList.toggle('is-light', selected === 'light');
-
     if (persist) {
       safeFetch('/api/theme', {
         method: 'POST',
@@ -176,7 +181,18 @@
     applyTheme(current === 'dark' ? 'light' : 'dark');
   }
 
-  // URL history
+  /* ---------- URL history ---------- */
+
+  function fillUrlInput(url) {
+    showHome();
+
+    if ($('phase-2')) $('phase-2').style.display = 'block';
+    if ($('phase-3')) $('phase-3').style.display = 'none';
+    if ($('url-input')) $('url-input').value = url;
+
+    $('url-input')?.focus();
+  }
+
   async function refreshUrlHistory() {
     const list = $('beans-url-list');
     if (!list) return;
@@ -184,8 +200,6 @@
     try {
       const data = await safeFetch('/api/history/urls', { cache: 'no-store' });
       const items = data.items || [];
-
-      $('beans-url-history-button')?.classList.toggle('has-items', items.length > 0);
 
       if (!items.length) {
         list.innerHTML = '<div class="beans-empty-state">Your analyzed URLs will appear here.</div>';
@@ -207,15 +221,7 @@
       list.querySelectorAll('[data-url-index]').forEach(button => {
         button.addEventListener('click', () => {
           const item = items[Number(button.dataset.urlIndex)];
-          if (!item) return;
-
-          showHome();
-
-          if ($('phase-2')) $('phase-2').style.display = 'block';
-          if ($('phase-3')) $('phase-3').style.display = 'none';
-          if ($('url-input')) $('url-input').value = item.url;
-
-          $('url-input')?.focus();
+          if (item) fillUrlInput(item.url);
         });
       });
     } catch (error) {
@@ -234,20 +240,16 @@
     }
   }
 
-  // Download status helpers
+  /* ---------- Download status helpers ---------- */
+
   function statusClass(status) {
-    const value = String(status || '').toLowerCase();
-
-    if (value === 'completed') return 'success';
-    if (['failed', 'error', 'interrupted'].includes(value)) return 'danger';
-    if (value === 'cancelled') return 'muted';
-
+    if (status === 'completed') return 'success';
+    if (['failed', 'error', 'interrupted'].includes(status)) return 'danger';
+    if (status === 'cancelled') return 'muted';
     return 'active';
   }
 
   function statusLabel(status) {
-    const value = String(status || 'starting').toLowerCase();
-
     return ({
       queued: 'Queued',
       starting: 'Starting',
@@ -255,58 +257,101 @@
       merging: 'Processing',
       subtitles: 'Subtitles',
       embedding: 'Embedding subtitles',
-      finalizing: 'Finalizing',
       cancelling: 'Cancelling',
       completed: 'Completed',
       failed: 'Failed',
       error: 'Failed',
       cancelled: 'Cancelled',
       interrupted: 'Interrupted'
-    })[value] || value.replaceAll('_', ' ');
+    })[status] || status.replaceAll('_', ' ');
   }
 
-  // Download drawer and history
+  function activeCardHtml(item) {
+    const status = statusOf(item);
+    const percentText = item.overall_percent || item.percent || '0%';
+    const percentNumber = Math.max(0, Math.min(100, parseFloat(percentText) || 0));
+    const caption = status === 'queued' ? 'Waiting in queue'
+      : status === 'cancelling' ? 'Cancelling…'
+      : `${statusLabel(status)}…`;
+
+    return `
+      <div class="beans-active-card" data-active-task="${esc(item.task_id)}">
+        <div class="beans-active-top">
+          <span class="beans-status-dot"></span>
+          <span>${status === 'queued' ? 'QUEUED DOWNLOAD' : 'ACTIVE DOWNLOAD'}</span>
+          <span class="beans-active-percent">${esc(percentText)}</span>
+        </div>
+        <div class="beans-download-title">${esc(item.title || item.url || 'Downloading media')}</div>
+        <div class="beans-progress-track"><i style="width:${percentNumber}%"></i></div>
+        <div class="beans-active-bottom">
+          <span>${esc(caption)}</span>
+          <button type="button" data-cancel-task="${esc(item.task_id)}"${status === 'cancelling' ? ' disabled' : ''}>Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function historyCardHtml(item) {
+    const status = statusOf(item);
+    const embedded = Boolean(item.subtitles_embedded) ||
+      /subtitles embedded successfully/i.test(String(item.subtitle_notice || ''));
+    const canReveal = status === 'completed' && item.filename;
+    const canRetry = RETRYABLE.includes(status) && item.url;
+
+    const kind = item.mode === 'mp3' ? 'MP3 audio' : item.mode === 'image' ? 'Image' : 'Video';
+    const shortMeta = `${kind}${status === 'completed' && embedded ? ' · CC' : ''}`;
+
+    const icon = status === 'completed' ? '✓'
+      : FAILED.includes(status) ? '!'
+      : ['cancelled', 'interrupted'].includes(status) ? '×' : '↓';
+
+    return `
+      <article class="beans-download-item compact-download-item">
+        <div class="beans-download-item-icon ${statusClass(status)}">${icon}</div>
+        <div class="beans-download-item-body">
+          <div class="beans-download-title" title="${esc(item.title || '')}">
+            ${esc(item.title || 'Media download')}
+            ${status === 'completed' && embedded
+              ? '<span class="beans-cc-badge" title="Subtitles embedded">CC</span>' : ''}
+          </div>
+          <div class="beans-download-item-meta">${esc(shortMeta)}</div>
+          <div class="beans-download-item-footer">
+            <span class="beans-status-pill ${statusClass(status)}">${status === 'completed' ? '' : esc(statusLabel(status))}</span>
+            <span>${esc(dateLabel(item.updated_at || item.timestamp))}</span>
+          </div>
+          ${item.error && status !== 'completed'
+            ? `<div class="beans-download-error">${esc(item.error)}</div>` : ''}
+          ${status === 'completed' && item.subtitle_notice && !embedded
+            ? `<div class="beans-download-note">${esc(item.subtitle_notice)}</div>` : ''}
+          <div class="beans-download-actions">
+            ${canReveal ? `<button type="button" data-reveal="${esc(item.task_id)}">Show file</button>` : ''}
+            ${canRetry ? `<button type="button" data-retry="${esc(item.url)}">Try again</button>` : ''}
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  /* ---------- Downloads drawer ---------- */
+
   async function refreshDownloads() {
     try {
       const data = await safeFetch('/api/history/downloads', { cache: 'no-store' });
       const items = data.items || [];
 
-      const activeItems = items.filter(item =>
-        !['completed', 'failed', 'cancelled', 'interrupted']
-          .includes(String(item.status || '').toLowerCase())
-      );
+      const activeItems = items.filter(item => !isTerminal(item));
+      const historyItems = items.filter(isTerminal);
 
+      // Badge: empty text hides it via CSS (.beans-nav-count:not(:empty)).
       const count = $('beans-download-count');
       if (count) count.textContent = activeItems.length ? String(activeItems.length) : '';
 
       const activeContainer = $('beans-download-active');
-
       if (activeContainer) {
-        activeContainer.innerHTML = activeItems.map(item => `
-          <div class="beans-active-card" data-active-task="${esc(item.task_id)}">
-            <div class="beans-active-top">
-              <span class="beans-status-dot"></span>
-              <span>${String(item.status).toLowerCase() === 'queued' ? 'QUEUED DOWNLOAD' : 'ACTIVE DOWNLOAD'}</span>
-              <span class="beans-active-percent">${esc(item.overall_percent || item.percent || '0%')}</span>
-            </div>
-            <div class="beans-download-title">${esc(item.title || item.url || 'Downloading media')}</div>
-            <div class="beans-progress-track">
-              <i style="width:${Math.max(0, Math.min(100, parseFloat(item.overall_percent || item.percent) || 0))}%"></i>
-            </div>
-            <div class="beans-active-bottom">
-              <span>${String(item.status).toLowerCase() === 'queued'
-                ? 'Waiting in queue'
-                : String(item.status).toLowerCase() === 'cancelling'
-                  ? 'Cancelling…' : 'Downloading…'}</span>
-              <button type="button" data-cancel-task="${esc(item.task_id)}">Cancel</button>
-            </div>
-          </div>
-        `).join('');
+        activeContainer.innerHTML = activeItems.map(activeCardHtml).join('');
 
         activeContainer.querySelectorAll('[data-cancel-task]').forEach(button => {
           button.addEventListener('click', async () => {
-            const taskId = button.dataset.cancelTask;
-
             button.disabled = true;
             button.textContent = 'Cancelling...';
 
@@ -314,9 +359,8 @@
               await safeFetch('/api/cancel', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: taskId })
+                body: JSON.stringify({ task_id: button.dataset.cancelTask })
               });
-
               await refreshDownloads();
             } catch (error) {
               alert(error.message || 'Could not cancel this download.');
@@ -327,63 +371,12 @@
         });
       }
 
-      const terminalStatuses = [
-        'completed', 'failed', 'error', 'cancelled', 'interrupted'
-      ];
-
-      const historyItems = items.filter(item =>
-        terminalStatuses.includes(String(item.status || '').toLowerCase())
-      );
-
       const historyContainer = $('beans-download-list');
-
       if (!historyContainer) return;
 
       historyContainer.innerHTML = historyItems.length
-        ? historyItems.map(item => {
-            const status = String(item.status || 'starting').toLowerCase();
-            const canReveal = status === 'completed' && item.filename;
-            const canRetry = ['failed', 'error', 'cancelled', 'interrupted'].includes(status) && item.url;
-            const embedded = Boolean(item.subtitles_embedded) ||
-              /subtitles embedded successfully/i.test(String(item.subtitle_notice || ''));
-
-            const shortMeta = status === 'completed'
-              ? `${item.mode === 'mp3' ? 'MP3 audio' : 'Video'}${embedded ? ' · CC' : ''}`
-              : (item.error || statusLabel(status));
-
-            const icon = status === 'completed' ? '✓'
-              : ['failed', 'error'].includes(status) ? '!'
-              : ['cancelled', 'interrupted'].includes(status) ? '×' : '↓';
-
-            return `
-              <article class="beans-download-item compact-download-item">
-                <div class="beans-download-item-icon ${statusClass(status)}">${icon}</div>
-                <div class="beans-download-item-body">
-                  <div class="beans-download-title" title="${esc(item.title || '')}">
-                    ${esc(item.title || 'Media download')}
-                    ${status === 'completed' && embedded
-                      ? '<span class="beans-cc-badge" title="Subtitles embedded">CC</span>' : ''}
-                  </div>
-                  <div class="beans-download-item-meta">${esc(shortMeta)}</div>
-                  <div class="beans-download-item-footer">
-                    <span class="beans-status-pill ${statusClass(status)}">
-                      ${status === 'completed' ? '' : esc(statusLabel(status))}
-                    </span>
-                    <span>${esc(dateLabel(item.updated_at || item.timestamp))}</span>
-                  </div>
-                  ${item.error && status !== 'completed'
-                    ? `<div class="beans-download-error">${esc(item.error)}</div>` : ''}
-                  ${status === 'completed' && item.subtitle_notice && !embedded
-                    ? `<div class="beans-download-note">${esc(item.subtitle_notice)}</div>` : ''}
-                  <div class="beans-download-actions">
-                    ${canReveal ? `<button type="button" data-reveal="${esc(item.task_id)}">Show file</button>` : ''}
-                    ${canRetry ? `<button type="button" data-retry="${esc(item.url)}">Try again</button>` : ''}
-                  </div>
-                </div>
-              </article>
-            `;
-          }).join('')
-        : '<div class="beans-empty-state">No completed or failed downloads yet.</div>';
+        ? historyItems.map(historyCardHtml).join('')
+        : '<div class="beans-empty-state">Files you download appear here</div>';
 
       historyContainer.querySelectorAll('[data-reveal]').forEach(button => {
         button.addEventListener('click', async () => {
@@ -400,13 +393,7 @@
       historyContainer.querySelectorAll('[data-retry]').forEach(button => {
         button.addEventListener('click', () => {
           closeDrawer();
-          showHome();
-
-          if ($('phase-2')) $('phase-2').style.display = 'block';
-          if ($('phase-3')) $('phase-3').style.display = 'none';
-          if ($('url-input')) $('url-input').value = button.dataset.retry;
-
-          $('url-input')?.focus();
+          fillUrlInput(button.dataset.retry);
         });
       });
     } catch (error) {
@@ -445,7 +432,8 @@
     }
   }
 
-  // Keep functions used by inline HTML onclick handlers available globally.
+  // Functions used by inline onclick handlers in the HTML.
+  window.switchSettingsTab = switchSettingsTab;
   window.showHome = showHome;
   window.openDrawer = openDrawer;
   window.closeDrawer = closeDrawer;
@@ -465,12 +453,10 @@
       setTimeout(refreshUrlHistory, 1600);
     });
 
-    historyRefreshTimer = setInterval(() => {
+    // Light background refresh keeps the sidebar badge current even with the drawer closed.
+    setInterval(() => {
       refreshUrlHistory();
-
-      if ($('beans-download-drawer')?.classList.contains('open')) {
-        refreshDownloads();
-      }
+      if (!downloadsTimer) refreshDownloads();
     }, 5000);
   });
 })();

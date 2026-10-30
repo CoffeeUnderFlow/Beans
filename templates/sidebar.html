@@ -1,141 +1,263 @@
-<!-- Application shell -->
+<!-- Application Shell -->
 <div id="beans-app-shell" class="beans-app-shell">
 
     <!-- LEFT SIDEBAR -->
-    <aside class="beans-sidebar" aria-label="Application sidebar">
-        <div class="beans-sidebar-brand"></div>
+    <aside id="beans-sidebar" class="beans-sidebar" aria-label="Application sidebar">
 
-        <div class="beans-sidebar-actions">
-            <button class="beans-nav-button active" id="beans-home-button" type="button">
-                <span class="beans-nav-icon">⌂</span><span>Home</span>
+        <!-- Sidebar Toggle -->
+        <button id="beans-sidebar-toggle" class="beans-nav-button beans-menu-toggle"
+                type="button" title="Menu" aria-label="Toggle sidebar">
+            <span class="beans-nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </span>
+        </button>
+
+        <!-- Navigation -->
+        <nav class="beans-sidebar-actions" aria-label="Main navigation">
+
+            <button id="beans-home-button" class="beans-nav-button active"
+                    type="button" aria-current="page">
+                <span class="beans-nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </span>
+                <span class="beans-nav-label">Home</span>
             </button>
-            <button class="beans-nav-button" id="beans-url-history-button" type="button">
-                <span class="beans-nav-icon">↶</span><span>URL History</span>
+
+            <button id="beans-downloads-button" class="beans-nav-button"
+                    type="button">
+                <span class="beans-nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                </span>
+                <span class="beans-nav-label">Downloads</span>
+                <!-- Empty = hidden (CSS :not(:empty)); sidebar.js fills it with the active count -->
+                <span id="beans-download-count" class="beans-nav-count"
+                      aria-label="Active downloads"></span>
             </button>
-            <button class="beans-nav-button" id="beans-downloads-button" type="button">
-                <span class="beans-nav-icon">↓</span><span>Downloads</span>
-                <span class="beans-nav-count" id="beans-download-count"></span>
+
+            <button id="beans-url-history-button" class="beans-nav-button"
+                    type="button">
+                <span class="beans-nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                </span>
+                <span class="beans-nav-label">URL History</span>
             </button>
-        </div>
 
-        <div class="beans-sidebar-section-head">
-            <span>RECENT URLS</span>
-            <button type="button" id="beans-clear-urls" title="Clear URL history">Clear</button>
-        </div>
+        </nav>
 
-        <div class="beans-url-list" id="beans-url-list">
-            <div class="beans-empty-state">Your analyzed URLs will appear here.</div>
-        </div>
+        <!-- URL History -->
+        <section id="beans-history-section" class="beans-sidebar-history-wrapper"
+                 aria-label="Recent links">
+            <div class="beans-sidebar-section-head">
+                <span>Recent links</span>
+                <button id="beans-clear-urls" type="button" title="Clear URL history">
+                    Clear all
+                </button>
+            </div>
 
+            <div id="beans-url-list" class="beans-url-list">
+                <div class="beans-empty-state">
+                    Your analyzed URLs will appear here.
+                </div>
+            </div>
+        </section>
+
+        <!-- Sidebar Footer -->
         <div class="beans-sidebar-bottom">
-            <button class="beans-nav-button" id="beans-settings-button" type="button">
-                <span class="beans-nav-icon">⚙</span><span>Settings</span>
-                <span class="beans-chevron" id="beans-settings-chevron">⌄</span>
+            <button id="beans-settings-button" class="beans-nav-button"
+                    type="button">
+                <span class="beans-nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </span>
+                <span class="beans-nav-label">Settings</span>
             </button>
-
-            <div class="beans-settings-expand" id="beans-settings-expand" hidden>
-                <p>Download folder, subtitles, and cookies</p>
-                <button type="button" id="beans-open-settings">Open settings</button>
-            </div>
-
-            <button class="beans-theme-button" id="beans-theme-toggle" type="button">
-                <span id="beans-theme-icon">☾</span>
-                <span id="beans-theme-label">Dark mode</span>
-                <span class="beans-theme-switch"><i></i></span>
-            </button>
-
-            <div class="beans-sidebar-footer">
-                Beans Extractor <span>by CoffeeUnderFlow</span>
-            </div>
         </div>
+
     </aside>
 
     <!-- MAIN WORKSPACE -->
     <main class="beans-workspace">
         <header class="beans-topbar">
-            <div>
-                <div class="beans-page-eyebrow">MEDIA TOOLKIT</div>
-                <div class="beans-page-title" id="beans-page-title">Home</div>
-            </div>
-            <button type="button" class="beans-top-downloads" id="beans-top-downloads">
-                <span>↓</span> Downloads
+            <button id="beans-top-downloads" class="beans-top-downloads"
+                    type="button" aria-label="Downloads" title="Downloads">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
             </button>
         </header>
 
+        <!-- The extractor card is moved in here by sidebar.js -->
         <div class="beans-workspace-content"></div>
     </main>
 
     <!-- DOWNLOAD DRAWER BACKDROP -->
-    <div class="beans-drawer-scrim" id="beans-drawer-scrim"></div>
+    <div id="beans-drawer-scrim" class="beans-drawer-scrim"></div>
 
-    <!-- RIGHT DOWNLOAD DRAWER -->
-    <aside class="beans-download-drawer" id="beans-download-drawer"
-        aria-label="Download history" aria-hidden="true">
+    <!-- DOWNLOAD HISTORY DRAWER -->
+    <aside id="beans-download-drawer" class="beans-download-drawer"
+           aria-label="Download history" aria-hidden="true">
 
-        <div class="beans-drawer-header">
-            <div><h2>Downloads</h2></div>
-            <button type="button" id="beans-close-drawer" aria-label="Close downloads">×</button>
-        </div>
+        <header class="beans-drawer-header">
+            <h2>Recent download history</h2>
+            <button id="beans-close-drawer" class="beans-modal-close"
+                    type="button" aria-label="Close downloads">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </header>
 
-        <div class="beans-download-active" id="beans-download-active"></div>
+        <!-- Active downloads -->
+        <div id="beans-download-active" class="beans-download-active"></div>
 
+        <!-- Finished downloads (filled by sidebar.js) -->
+        <div id="beans-download-list" class="beans-download-list"></div>
+
+        <!-- Drawer footer -->
         <div class="beans-drawer-list-head">
-            <span>DOWNLOAD HISTORY</span>
-            <button type="button" id="beans-clear-downloads">Clear history</button>
+            <div class="beans-info-tooltip" tabindex="0"
+                 aria-label="Clearing history never deletes downloaded files.">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span class="beans-tooltip-text">
+                    Clearing history never deletes downloaded files.
+                </span>
+            </div>
+
+            <button id="beans-clear-downloads" type="button">Clear all</button>
         </div>
 
-        <div class="beans-download-list" id="beans-download-list">
-            <div class="beans-empty-state">No downloads yet.</div>
-        </div>
-
-        <p class="beans-history-note">
-            Clearing history never deletes downloaded files.
-        </p>
     </aside>
 
-    <!-- SETTINGS MODAL -->
-    <div id="settings-modal"
-        style="display:none;position:fixed;inset:0;width:100%;height:100%;
-        background:rgba(0,0,0,.7);z-index:1300;justify-content:center;align-items:center;">
+<!-- SETTINGS MODAL -->
+<div id="settings-modal" class="beans-modal-backdrop">
+    <div class="beans-modal-content" role="dialog"
+         aria-modal="true" aria-labelledby="beans-settings-title">
 
-        <div class="settings-modal-content"
-            style="background:#1e1e2f;color:#fff;padding:25px;border-radius:12px;
-            box-shadow:0 8px 24px rgba(0,0,0,.5);font-family:sans-serif;">
+        <header class="beans-modal-header">
+            <h3 id="beans-settings-title">Settings</h3>
+            <button class="beans-modal-close" type="button"
+                    onclick="closeSettingsModal()" aria-label="Close settings">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </header>
 
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                <h3 style="margin:0;font-size:1.2rem;color:#ff9800;">Application Settings</h3>
-                <button onclick="closeSettingsModal()"
-                    style="background:none;border:none;color:#aaa;font-size:1.2rem;cursor:pointer;"
-                    aria-label="Close settings">&times;</button>
+        <!-- Segmented Tab Navigation -->
+        <div class="beans-settings-tabs" role="tablist" aria-label="Settings sections">
+            <button type="button" id="tab-btn-preferences" class="beans-tab-btn active" role="tab"
+                    aria-selected="true" aria-controls="tab-preferences"
+                    onclick="switchSettingsTab('preferences', this)">
+                Preferences
+            </button>
+            <button type="button" id="tab-btn-more" class="beans-tab-btn" role="tab"
+                    aria-selected="false" aria-controls="tab-more"
+                    onclick="switchSettingsTab('more', this)">
+                More
+            </button>
+        </div>
+
+        <!-- Errors raised while the modal is open show here (the page banner is hidden behind the backdrop) -->
+        <div id="settings-error" class="beans-modal-error" role="alert" hidden></div>
+
+        <!-- ==================== TAB 1: PREFERENCES ==================== -->
+        <div id="tab-preferences" class="beans-tab-panel active" role="tabpanel"
+             aria-labelledby="tab-btn-preferences">
+
+            <!-- Theme -->
+            <div class="beans-settings-field">
+                <label for="beans-theme-toggle">Appearance</label>
+                <button id="beans-theme-toggle" class="beans-theme-switcher"
+                        type="button" title="Toggle theme">
+                    <span class="beans-theme-left">
+                        <span id="beans-theme-icon" class="beans-theme-icon-box" aria-hidden="true">☾</span>
+                        <span class="beans-theme-text">
+                            <strong id="beans-theme-label">Dark mode</strong>
+                            <small>Click to switch appearance</small>
+                        </span>
+                    </span>
+                    <span class="beans-theme-switch">
+                        <i></i>
+                    </span>
+                </button>
             </div>
 
-            <div style="margin-bottom:15px;">
-                <label for="setting-download-dir"
-                    style="display:block;font-size:.9rem;margin-bottom:5px;color:#ccc;">
-                    Download Directory
-                </label>
-                <div style="display:flex;gap:8px;">
-                    <input type="text" id="setting-download-dir"
-                        style="flex:1;min-width:0;padding:8px;background:#2a2a3d;
-                        border:1px solid #444;border-radius:6px;color:#fff;box-sizing:border-box;">
-                    <button onclick="selectFolder()"
-                        style="padding:8px 14px;background:#444;color:#fff;border:none;
-                        border-radius:6px;cursor:pointer;font-size:.85rem;">Browse...</button>
+            <!-- Download Directory -->
+            <div class="beans-settings-field">
+                <label for="setting-download-dir">Download Directory</label>
+                <div class="beans-settings-inline">
+                    <input type="text" id="setting-download-dir">
+                    <button type="button" class="beans-icon-button"
+                            onclick="selectFolder()" title="Browse folder" aria-label="Browse folder">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+                             stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </button>
                 </div>
+                <small class="beans-field-hint">
+                    Files are always saved in a “Beans Extractor” folder inside the chosen location.
+                </small>
             </div>
 
+            <!-- Subtitles -->
             <section id="subtitle-settings-block">
                 <div class="me-subtitle-row">
-                    <div><div class="me-subtitle-title">Include Subtitles</div></div>
+                    <div>
+                        <div class="me-subtitle-title">Include Subtitles</div>
+                        <div class="me-subtitle-help">Optional. When off, no subtitle lookup, download or embedding is done.</div>
+                    </div>
                     <label class="me-subtitle-switch" aria-label="Include subtitles">
-                        <input id="settings-include-subtitles" type="checkbox"
-                            aria-label="Include subtitles">
+                        <input id="settings-include-subtitles" type="checkbox">
                         <span class="me-subtitle-slider"></span>
                     </label>
                 </div>
 
                 <div id="settings-subtitle-language-group"
-                    class="me-subtitle-language" style="display:none;">
+                     class="me-subtitle-language" style="display:none;">
                     <label for="settings-subtitle-language">Subtitle language</label>
                     <select id="settings-subtitle-language">
                         <option value="en" selected>English</option>
@@ -169,39 +291,82 @@
                         <option value="el">Greek</option>
                         <option value="he">Hebrew</option>
                     </select>
+                    <div class="me-subtitle-help">Only this language is used. Creator subtitles are preferred; auto-generated ones are the fallback.</div>
                 </div>
             </section>
-
-            <div style="margin-bottom:20px;">
-                <label for="setting-cookies-file"
-                    style="display:block;font-size:.9rem;margin-bottom:5px;color:#ccc;">
-                    Fallback Cookies File (cookies.txt)
-                </label>
-                <input type="file" id="setting-cookies-file" accept=".txt"
-                    style="font-size:.85rem;color:#aaa;max-width:100%;">
-                <button onclick="uploadCookiesFile()"
-                    style="margin-top:8px;padding:6px 12px;background:#444;color:#fff;
-                    border:none;border-radius:4px;cursor:pointer;font-size:.85rem;">
-                    Upload Cookies File
-                </button>
-                <span id="cookie-upload-status"
-                    style="font-size:.8rem;margin-left:10px;color:#4caf50;"></span>
-            </div>
-
-            <div style="background:#252538;padding:10px;border-radius:6px;font-size:.8rem;
-                color:#aaa;margin-bottom:20px;">
-                <strong>Help:</strong> If access to a media site fails, export your cookies
-                as a text file and upload it above as a fallback.
-            </div>
-
-            <div style="display:flex;justify-content:flex-end;gap:10px;">
-                <button onclick="closeSettingsModal()"
-                    style="padding:8px 16px;background:#333;color:#fff;border:none;
-                    border-radius:6px;cursor:pointer;">Cancel</button>
-                <button id="settings-save-btn" onclick="saveSettings()"
-                    style="padding:8px 16px;background:#ff9800;color:#000;font-weight:bold;
-                    border:none;border-radius:6px;cursor:pointer;">Save Settings</button>
-            </div>
         </div>
+
+        <!-- ==================== TAB 2: MORE ==================== -->
+        <div id="tab-more" class="beans-tab-panel" role="tabpanel"
+             aria-labelledby="tab-btn-more">
+
+            <!-- Fallback Cookies -->
+            <div class="beans-settings-field">
+                <label for="setting-cookies-file">Fallback Cookies File (cookies.txt)</label>
+                <div class="beans-cookies-row">
+                    <input type="file" id="setting-cookies-file" accept=".txt">
+                    <button id="beans-upload-cookies" class="beans-settings-button"
+                            type="button" onclick="uploadCookiesFile()">
+                        Upload Cookies File
+                    </button>
+                </div>
+                <span id="cookie-upload-status" role="status"></span>
+            </div>
+
+            <!-- Help Box -->
+            <div class="beans-settings-help">
+                <strong>Help:</strong>
+                If access to a media site fails, export your cookies as a text
+                file and upload it above as a fallback.
+            </div>
+
+            <hr class="beans-settings-divider">
+
+            <!-- About & Info Card -->
+            <div class="beans-about-card">
+                <div class="beans-about-header">
+                    <div>
+                        <h4 class="beans-app-name">Beans Extractor</h4>
+                        <p class="beans-app-tagline">Desktop Media Downloader</p>
+                    </div>
+                    <span class="beans-version-badge">v1.0.0</span>
+                </div>
+
+                <div class="beans-about-meta">
+                    <div class="beans-meta-row">
+                        <span>Developed by</span>
+                        <strong>CoffeeUnderFlow</strong>
+                    </div>
+                    <div class="beans-meta-row">
+                        <span>Built with</span>
+                        <span>Python, Flask, yt-dlp &amp; gallery-dl</span>
+                    </div>
+                </div>
+
+                <div class="beans-about-links">
+                    <a href="https://coffeeunderflow.in/" target="_blank" rel="noopener noreferrer" class="beans-link-pill">
+                        Website
+                    </a>
+                    <a href="https://github.com/CoffeeUnderFlow" target="_blank" rel="noopener noreferrer" class="beans-link-pill">
+                        Source
+                    </a>
+                    <a href="https://coffeeunderflow.in/" target="_blank" rel="noopener noreferrer" class="beans-link-pill">
+                        Get Help &amp; Report Bug
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Actions (Shared Footer) -->
+        <footer class="beans-settings-actions">
+            <button type="button" class="beans-settings-button"
+                    onclick="closeSettingsModal()">Cancel</button>
+            <button id="settings-save-btn" type="button"
+                    onclick="saveSettings()">Save</button>
+        </footer>
+
     </div>
+</div>
+
 </div>

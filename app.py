@@ -55,7 +55,6 @@ def normalize_download_dir(path):
 
 DEFAULT_CONFIG = {
     'download_dir': os.path.join(USER_HOME, 'Downloads', 'Beans Extractor'),
-    'browser_choice': 'chrome',
     'include_subtitles': False,
     'subtitle_language': 'en',
 }
@@ -114,8 +113,9 @@ os.makedirs(CONFIG['download_dir'], exist_ok=True)
 
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'), static_folder=os.path.join(BASE_DIR, 'static'))
 
-# Global task registry. A single active task is allowed so that cancelling and
-# starting a new download cannot leave two yt-dlp workers writing the same file.
+# Global task registry. Up to two downloads run at once (DOWNLOAD_SLOTS); extra tasks
+# wait in the queue. Two tasks with identical URL + options are refused, because they
+# would share one .beans cache folder and one output filename.
 TASKS = {}
 CURRENT_TASK_ID = None
 
@@ -123,7 +123,7 @@ DOWNLOAD_SLOTS = threading.BoundedSemaphore(2)
 TASKS_LOCK = threading.RLock()
 CANCEL_EVENTS = {}
 ACTIVE_PROCESSES = {}  # cancellable external processes, e.g. FFmpeg subtitle muxing
-TERMINAL_TASK_STATUSES = {'completed', 'failed', 'cancelled'}
+TERMINAL_TASK_STATUSES = {'completed', 'failed', 'error', 'cancelled', 'interrupted'}
 
 
 # Persistent app history lives outside the download directory. Clearing history never deletes media.
@@ -245,7 +245,27 @@ def raise_if_cancelled(task_id):
 
 
 # 3. ==============================     CANCELLATION ENDPOINT      =====================================================
+ALLOWED_HOSTS = {'127.0.0.1:5000', 'localhost:5000'}
 
+
+@app.before_request
+def reject_foreign_requests():
+    if request.host not in ALLOWED_HOSTS:
+        return jsonify({'success': False, 'error': 'Unexpected host.'}), 403
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        from urllib.parse import urlsplit
+        origin = request.headers.get('Origin') or request.headers.get('Referer')
+        if origin and urlsplit(origin).netloc not in ALLOWED_HOSTS:
+            return jsonify({'success': False, 'error': 'Cross-origin requests are not allowed.'}), 403
+
+
+@app.after_request
+def add_header(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+    
 @app.route('/api/cancel', methods=['POST'])
 def cancel_download():
     """Request cancellation of one specific task; do not pretend it has stopped yet."""
@@ -1111,7 +1131,7 @@ def download_gallery_image(url, format_id, image_url=None):
 
 @app.route('/api/download', methods=['POST'])
 def api_download():
-    """Start one task, refusing overlapping workers until the prior worker has exited."""
+    """Start a download task (two run at once; extra tasks are queued)."""
     global CURRENT_TASK_ID
     data = request.get_json(silent=True) or {}
     url = str(data.get('url') or '').strip()
@@ -1203,13 +1223,21 @@ def api_download():
     # Reuse the exact same .beans folder for the same URL + selected output parameters.
     # Task IDs are deliberately NOT part of this key, so a cancelled download can resume.
     cache_key = make_download_cache_key(url, mode, height, format_id)
+    with TASKS_LOCK:
+        for other in TASKS.values():
+            if (other.get('cache_key') == cache_key
+                    and other.get('status') not in TERMINAL_TASK_STATUSES):
+                return jsonify({
+                    'success': False,
+                    'error': 'This media is already being downloaded with the same settings.'
+                }), 409
     task_id = str(uuid.uuid4())
     # Reserve one of the two download slots immediately, or accept this task into the queue.
     slot_acquired = DOWNLOAD_SLOTS.acquire(blocking=False)
 
     with TASKS_LOCK:
         TASKS[task_id] = {
-            'task_id': task_id, 'url': url, 'title': url, 'mode': str(mode or 'video'),
+            'task_id': task_id, 'cache_key': cache_key, 'url': url, 'title': url, 'mode': str(mode or 'video'),
             'height': height, 'format_id': format_id,
             'status': 'starting' if slot_acquired else 'queued',
             'percent': '0%', 'overall_percent': '0%', 'progress_floor': 0.0, 'subtitles_embedded': False, 'error': None,
@@ -1516,6 +1544,7 @@ def api_download():
             # A cancelled or failed task keeps its cache for up to 30 days.
             if task_temp_dir and end_status == 'completed':
                 shutil.rmtree(task_temp_dir, ignore_errors=True)
+                shutil.rmtree(task_temp_dir + '_fresh', ignore_errors=True)
             with TASKS_LOCK:
                 ACTIVE_PROCESSES.pop(task_id, None)
                 CANCEL_EVENTS.pop(task_id, None)
@@ -1616,7 +1645,7 @@ def api_select_folder():
 
         return jsonify({
             'success': True,
-            'path': selected_path
+            'path': normalize_download_dir(selected_path)
         })
 
     except Exception as e:
@@ -1690,7 +1719,11 @@ def api_reveal_download(task_id):
         return jsonify({'success': False, 'error': 'No completed filename is recorded for this task.'}), 404
     download_dir = os.path.abspath(CONFIG['download_dir'])
     filepath = os.path.abspath(os.path.join(download_dir, filename))
-    if os.path.commonpath([download_dir, filepath]) != download_dir or not os.path.isfile(filepath):
+    try:
+        inside_download_dir = os.path.commonpath([download_dir, filepath]) == download_dir
+    except ValueError:
+        inside_download_dir = False
+    if not inside_download_dir or not os.path.isfile(filepath):
         return jsonify({'success': False, 'error': 'The completed file could not be found in the download folder.'}), 404
     try:
         if os.name == 'nt':
@@ -1707,7 +1740,12 @@ def api_reveal_download(task_id):
 @app.route('/')
 def index():
     """Render the main application UI interface."""
-    return render_template('index.html')
+    try:
+        with open(THEME_FILE, 'r', encoding='utf-8') as handle:
+            theme = json.load(handle).get('theme', 'dark')
+    except (OSError, ValueError, TypeError, AttributeError):
+        theme = 'dark'
+    return render_template('index.html', theme=theme if theme in ('dark', 'light') else 'dark')
 
 if __name__ == '__main__':
     import threading
@@ -1722,6 +1760,14 @@ if __name__ == '__main__':
         daemon=True
     )
     flask_thread.start()
+
+    import socket
+    for _ in range(50):
+        try:
+            with socket.create_connection(('127.0.0.1', 5000), timeout=0.2):
+                break
+        except OSError:
+            time.sleep(0.1)
 
     window = webview.create_window(
         'Beans Extractor',

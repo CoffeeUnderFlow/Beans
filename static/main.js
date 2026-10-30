@@ -1,126 +1,43 @@
-let activeMedia, activePoller, errorTimeout, activeTaskId = null, cancelRequestedByUI = false, imageGallery = [], currentImageIndex = 0, selectedImageIndexes = new Set(), selectedFormat = { mode: 'video', height: null };
+/* Beans Extractor — extractor page logic (inspect, format pick, start download, settings). */
+
+let activeMedia = null;
+let errorTimeout = null;
+let imageGallery = [];
+let currentImageIndex = 0;
+let selectedImageIndexes = new Set();
+let selectedFormat = { mode: 'video', height: null };
 
 const $ = id => document.getElementById(id);
+const ANSI_PATTERN = /\x1B\[[0-?]*[ -\/]*[@-~]/g;
 
-const SUBTITLE_LANGUAGE_OPTIONS = [
-    ['en', 'English'], ['hi', 'Hindi'], ['es', 'Spanish'], ['fr', 'French'],
-    ['de', 'German'], ['pt', 'Portuguese'], ['ar', 'Arabic'], ['bn', 'Bengali'],
-    ['zh-Hans', 'Chinese (Simplified)'], ['zh-Hant', 'Chinese (Traditional)'],
-    ['ja', 'Japanese'], ['ko', 'Korean'], ['ru', 'Russian'], ['it', 'Italian'],
-    ['ur', 'Urdu'], ['pa', 'Punjabi'], ['ta', 'Tamil'], ['te', 'Telugu'],
-    ['mr', 'Marathi'], ['id', 'Indonesian'], ['tr', 'Turkish'], ['vi', 'Vietnamese'],
-    ['th', 'Thai'], ['nl', 'Dutch'], ['pl', 'Polish'], ['sv', 'Swedish'],
-    ['uk', 'Ukrainian'], ['fa', 'Persian'], ['el', 'Greek'], ['he', 'Hebrew']
-];
+const settingsOpen = () => $('settings-modal')?.style.display === 'flex';
 
-const ensureSubtitleSettingsUI = () => {
-    const modal = $('settings-modal');
-    if (!modal) return;
+/* ---------- Errors ----------
+   While the settings modal is open the page banner is hidden behind its backdrop,
+   so errors are shown inside the modal instead. */
 
-    // Style the settings controls whether they came from index.html or are added dynamically.
-    if (!$('media-extractor-subtitle-setting-style')) {
-        const style = document.createElement('style');
-        style.id = 'media-extractor-subtitle-setting-style';
-        style.textContent = `
-            #subtitle-settings-block { margin:18px 0; padding:16px; border:1px solid var(--border-color,rgba(128,128,128,.3)); border-radius:12px; }
-            #subtitle-settings-block .me-subtitle-row { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-            #subtitle-settings-block .me-subtitle-title { font-weight:600; margin-bottom:4px; }
-            #subtitle-settings-block .me-subtitle-help { font-size:.88em; opacity:.75; line-height:1.4; }
-            #subtitle-settings-block .me-subtitle-language { margin-top:14px; }
-            #subtitle-settings-block .me-subtitle-language label { display:block; margin-bottom:7px; font-weight:500; }
-            #settings-subtitle-language { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:8px; border:1px solid var(--border-color,rgba(128,128,128,.4)); background:var(--input-bg,#2a2a3d); color:inherit; }
-            .me-subtitle-switch { position:relative; display:inline-block; width:46px; height:26px; flex:0 0 46px; }
-            .me-subtitle-switch input { position:absolute; opacity:0; width:1px; height:1px; }
-            .me-subtitle-slider { position:absolute; inset:0; cursor:pointer; border-radius:26px; background:#858585; transition:background .2s; }
-            .me-subtitle-slider:before { content:''; position:absolute; height:20px; width:20px; left:3px; top:3px; border-radius:50%; background:#fff; transition:transform .2s; }
-            .me-subtitle-switch input:checked + .me-subtitle-slider { background:var(--accent,#ff9800); }
-            .me-subtitle-switch input:checked + .me-subtitle-slider:before { transform:translateX(20px); }
-            .me-subtitle-switch input:focus-visible + .me-subtitle-slider { outline:2px solid var(--accent,#ff9800); outline-offset:2px; }
-        `;
-        document.head.appendChild(style);
-    }
-
-    let block = $('subtitle-settings-block');
-    if (!block) {
-        block = document.createElement('section');
-        block.id = 'subtitle-settings-block';
-        block.innerHTML = `
-            <div class="me-subtitle-row">
-                <div>
-                    <div class="me-subtitle-title">Include Subtitles</div>
-                    <div class="me-subtitle-help">Optional. When off, no subtitle-specific lookup, downloading, or embedding is performed.</div>
-                </div>
-                <label class="me-subtitle-switch" aria-label="Include subtitles">
-                    <input id="settings-include-subtitles" type="checkbox" aria-label="Include subtitles">
-                    <span class="me-subtitle-slider"></span>
-                </label>
-            </div>
-            <div id="settings-subtitle-language-group" class="me-subtitle-language" style="display:none">
-                <label for="settings-subtitle-language">Subtitle language</label>
-                <select id="settings-subtitle-language"></select>
-                <div class="me-subtitle-help" style="margin-top:7px">Only this language will be used. Creator subtitles are preferred; auto-generated subtitles are the fallback.</div>
-            </div>
-        `;
-
-        const root = modal.querySelector('.modal-content, .modal-body') || modal.firstElementChild || modal;
-        const cookieInput = $('setting-cookies-file');
-        const cookieGroup = cookieInput?.closest('.setting-group, .settings-group, .form-group, .setting-row');
-        const dirInput = $('setting-download-dir');
-        const dirGroup = dirInput?.closest('.setting-group, .settings-group, .form-group, .setting-row')
-            || dirInput?.parentElement?.parentElement;
-
-        if (cookieGroup && cookieGroup !== root && cookieGroup.parentElement) {
-            cookieGroup.parentElement.insertBefore(block, cookieGroup);
-        } else if (dirGroup && dirGroup !== root && dirGroup.parentElement) {
-            dirGroup.parentElement.insertBefore(block, dirGroup.nextSibling);
-        } else {
-            root.appendChild(block);
-        }
-    }
-
-    const languageSelect = $('settings-subtitle-language');
-    if (languageSelect && languageSelect.options.length === 0) {
-        SUBTITLE_LANGUAGE_OPTIONS.forEach(([code, label]) => {
-            const option = document.createElement('option');
-            option.value = code;
-            option.textContent = label;
-            languageSelect.appendChild(option);
-        });
-    }
-    if (languageSelect && !languageSelect.value) languageSelect.value = 'en';
-
-    const toggle = $('settings-include-subtitles');
-    if (toggle && toggle.dataset.subtitleVisibilityBound !== '1') {
-        toggle.addEventListener('change', updateSubtitleLanguageVisibility);
-        toggle.dataset.subtitleVisibilityBound = '1';
-    }
-
-    updateSubtitleLanguageVisibility();
+const clearError = () => {
+    clearTimeout(errorTimeout);
+    const banner = $('error-banner');
+    if (banner) banner.style.display = 'none';
+    const modalError = $('settings-error');
+    if (modalError) modalError.hidden = true;
 };
 
-const updateSubtitleLanguageVisibility = () => {
-    const toggle = $('settings-include-subtitles');
-    const group = $('settings-subtitle-language-group');
-    if (group) group.style.display = toggle?.checked ? 'block' : 'none';
+const showError = msg => {
+    clearError();
+    const text = String(msg).replace(ANSI_PATTERN, '');
+    if (settingsOpen() && $('settings-error')) {
+        $('settings-error').textContent = text;
+        $('settings-error').hidden = false;
+    } else if ($('error-banner')) {
+        $('error-banner').textContent = text;
+        $('error-banner').style.display = 'block';
+    } else {
+        return;
+    }
+    errorTimeout = setTimeout(clearError, 5000);
 };
-
-const clearError = () => { 
-    clearTimeout(errorTimeout); 
-    if ($('error-banner'))$('error-banner').style.cssText = 'opacity:0; display:none;'; 
-};
-
-const showError = msg => { 
-    clearError(); 
-    const b = $('error-banner'); 
-    if (!b) return; 
-    b.textContent = String(msg).replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, ''); 
-    b.style.cssText = 'display:block; opacity:1;'; 
-    errorTimeout = setTimeout(() => { 
-        b.style.opacity = '0'; 
-        setTimeout(() => b.style.display = 'none', 300); 
-    }, 4000); 
-};
-
 
 const getJsonResponse = async response => {
     let data;
@@ -135,271 +52,198 @@ const getJsonResponse = async response => {
     return data;
 };
 
-if ($('inspect-form')) {
-    $('inspect-form').addEventListener('submit', async e => {
-        e.preventDefault();
-        clearError();
-
-        const input = $('url-input');
-        const url = input?.value.trim();
-        const btn = $('inspect-btn');
-        const btnText = $('btn-text');
-        const btnLoader = $('btn-loader');
-
-        if (!url) {
-            showError('Please enter a media URL.');
-            return;
-        }
-
-        if (btn) {
-            btn.disabled = true;
-            if (btnText) btnText.style.display = 'none';
-            if (btnLoader) btnLoader.style.display = 'flex';
-        }
-
-        try {
-            const response = await fetch('/api/inspect', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url })
-            });
-            const data = await getJsonResponse(response);
-            if (!data.success) throw new Error(data.error || 'Failed to extract metadata.');
-
-            // Support both backend response shapes: {success, data:{...}} and {success, ...media}.
-            const media = (data.data && typeof data.data === 'object') ? data.data : data;
-            activeMedia = { ...media, original_url: media.original_url || url };
-
-            if ($('phase-2')) $('phase-2').style.display = 'none';
-            if ($('phase-3')) $('phase-3').style.display = 'block';
-            renderDashboard(activeMedia);
-        } catch (err) {
-            console.error('[Inspect] Error:', err);
-            showError(err.message || 'Failed to contact engine.');
-            input?.select();
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                if (btnText) btnText.style.display = 'inline';
-                if (btnLoader) btnLoader.style.display = 'none';
-            }
-        }
-    });
-}
-
-const renderDashboard = media => {
-    if (!media) {
-        showError('No media information was returned by the backend.');
-        return;
-    }
-    const isImg = media.formats?.[0]?.format_id?.startsWith('image_');
-    if ($('video-ui')) $('video-ui').style.display = isImg ? 'none' : 'block';
-    if ($('image-ui')) $('image-ui').style.display = isImg ? 'block' : 'none';
-    if (isImg) renderImageUI(media.formats || []);
-    else renderVideoUI(media);
-    // Hide legacy per-video subtitle controls; subtitles are controlled in Settings.
-    ['subtitle-section', 'enable-subtitles', 'subtitle-lang-select', 'download-subtitles-btn'].forEach(id => {
-        const element = $(id);
-        if (element) element.style.display = 'none';
-    });
+const formatDuration = value => {
+    const total = Number(value || 0);
+    if (!total) return '0:00';
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = Math.floor(total % 60);
+    return h
+        ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        : `${m}:${String(s).padStart(2, '0')}`;
 };
 
-const selectPill = (el, mode, height) => { 
-    document.querySelectorAll('#quality-grid .pill-btn').forEach(b => b.classList.remove('active')); 
-    el.classList.add('active'); 
-    selectedFormat = { mode, height }; 
+/* ---------- Step 1: inspect URL ---------- */
+
+$('inspect-form')?.addEventListener('submit', async e => {
+    e.preventDefault();
+    clearError();
+
+    const input = $('url-input');
+    const url = input?.value.trim();
+    const btn = $('inspect-btn');
+
+    if (!url) {
+        showError('Please enter a media URL.');
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        $('btn-text').style.display = 'none';
+        $('btn-loader').style.display = 'flex';
+    }
+
+    try {
+        const response = await fetch('/api/inspect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        const data = await getJsonResponse(response);
+        if (!data.success || !data.data) throw new Error(data.error || 'Failed to extract metadata.');
+
+        activeMedia = { ...data.data, original_url: data.data.original_url || url };
+
+        $('phase-2').style.display = 'none';
+        $('phase-3').style.display = 'block';
+        renderDashboard(activeMedia);
+    } catch (err) {
+        console.error('[Inspect] Error:', err);
+        showError(err.message || 'Failed to contact engine.');
+        input?.select();
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            $('btn-text').style.display = 'inline';
+            $('btn-loader').style.display = 'none';
+        }
+    }
+});
+
+/* ---------- Step 2: render ---------- */
+
+const renderDashboard = media => {
+    const isImg = media.formats?.[0]?.format_id?.startsWith('image_');
+    $('video-ui').style.display = isImg ? 'none' : 'block';
+    $('image-ui').style.display = isImg ? 'block' : 'none';
+    if (isImg) renderImageUI(media.formats || []);
+    else renderVideoUI(media);
+};
+
+const selectPill = (el, mode, height) => {
+    document.querySelectorAll('#quality-grid .pill-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    selectedFormat = { mode, height };
 };
 
 const renderVideoUI = media => {
     $('meta-thumb').src = media.thumbnail || '';
     $('meta-title').textContent = media.title || 'Unknown Title';
-
-    // Format duration
-    const seconds = Number(media.duration || 0);
-
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    let durationText;
-
-    if (hours > 0) {
-        durationText =
-            `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    } else {
-        durationText =
-            `${minutes}:${String(secs).padStart(2, '0')}`;
-    }
-
-    $('meta-duration').textContent = `Duration: ${durationText}`;
+    $('meta-duration').textContent = `Duration: ${formatDuration(media.duration)}`;
 
     const grid = $('quality-grid');
     grid.innerHTML = '';
 
-    /*
-     * -----------------------------------------
-     * CLEAN AND DEDUPLICATE VIDEO FORMATS
-     * -----------------------------------------
-     */
-
-    const uniqueFormats = [];
-    const seenHeights = new Set();
-
-    if (Array.isArray(media.formats)) {
-
-        media.formats.forEach(f => {
-
-            const height = Number(f.height);
-
-            if (!height) return;
-
-            // Remove duplicate resolutions
-            if (seenHeights.has(height)) return;
-
-            seenHeights.add(height);
-
-            uniqueFormats.push({
-                ...f,
-                height: height,
-                resolution: f.resolution || `${height}p`
-            });
-        });
-    }
-
-    // Highest quality first
-    uniqueFormats.sort((a, b) => b.height - a.height);
-
-    /*
-     * -----------------------------------------
-     * CREATE QUALITY BUTTON
-     * -----------------------------------------
-     */
-
-    const addPill = (txt, cls, act) => {
-
-        const p = document.createElement('div');
-
-        p.className = cls;
-        p.textContent = txt;
-
-        p.onclick = () => act(p);
-
-        grid.appendChild(p);
+    const addPill = (text, cls, action) => {
+        const pill = document.createElement('div');
+        pill.className = cls;
+        pill.textContent = text;
+        pill.onclick = () => action(pill);
+        grid.appendChild(pill);
     };
 
-    /*
-     * -----------------------------------------
-     * VIDEO QUALITIES
-     * -----------------------------------------
-     */
+    // The backend already de-duplicates heights; just make sure the order is highest first.
+    const formats = (media.formats || [])
+        .map(f => ({ ...f, height: Number(f.height) || 0 }))
+        .filter(f => f.height > 0)
+        .sort((a, b) => b.height - a.height);
 
-    if (uniqueFormats.length > 0) {
-
-        uniqueFormats.forEach((f, index) => {
-
+    if (formats.length) {
+        formats.forEach((f, index) => {
             addPill(
-                f.resolution,
+                f.resolution || `${f.height}p`,
                 `pill-btn ${index === 0 ? 'active' : ''}`,
-                p => selectPill(
-                    p,
-                    'video',
-                    f.height
-                )
+                pill => selectPill(pill, 'video', f.height)
             );
-
         });
-
-        // Select highest available quality
-        selectedFormat = {
-            mode: 'video',
-            height: uniqueFormats[0].height
-        };
-
+        selectedFormat = { mode: 'video', height: formats[0].height };
     } else {
-
-        addPill(
-            'Best Quality',
-            'pill-btn active',
-            p => selectPill(
-                p,
-                'video',
-                null
-            )
-        );
-
-        selectedFormat = {
-            mode: 'video',
-            height: null
-        };
+        addPill('Best Quality', 'pill-btn active', pill => selectPill(pill, 'video', null));
+        selectedFormat = { mode: 'video', height: null };
     }
 
-    /*
-     * -----------------------------------------
-     * AUDIO BUTTON
-     * -----------------------------------------
-     */
-
-    addPill(
-        'Audio (MP3 + Cover)',
-        'pill-btn audio',
-        p => selectPill(
-            p,
-            'mp3',
-            null
-        )
-    );
+    addPill('Audio (MP3 + Cover)', 'pill-btn audio', pill => selectPill(pill, 'mp3', null));
 };
 
-const updateCarousel = idx => { 
-    currentImageIndex = idx; 
-    $('carousel-main-img').src = imageGallery[idx].url; 
-    $('carousel-prev').disabled = idx === 0; 
-    $('carousel-next').disabled = idx === imageGallery.length - 1; 
+/* ---------- Image gallery ---------- */
+
+const updateCarousel = idx => {
+    if (!imageGallery[idx]) return;
+    currentImageIndex = idx;
+    $('carousel-main-img').src = imageGallery[idx].url;
+    $('carousel-prev').disabled = idx === 0;
+    $('carousel-next').disabled = idx === imageGallery.length - 1;
 };
 
-const updateMainDownloadButton = () => { 
-    const b = $('dl-selected-btn'); 
-    if (!b) return; 
-    const cnt = selectedImageIndexes.size; 
-    b.textContent = cnt ? `Download ${cnt} Image${cnt > 1 ? 's' : ''}` : 'Select an image to download'; 
-    b.disabled = !cnt; 
-    b.style.opacity = cnt ? '1' : '0.5'; 
+const updateMainDownloadButton = () => {
+    const btn = $('dl-selected-btn');
+    if (!btn) return;
+    const count = selectedImageIndexes.size;
+    btn.textContent = count ? `Download ${count} Image${count > 1 ? 's' : ''}` : 'Select an image to download';
+    btn.disabled = !count;
 };
 
 const renderImageGrid = () => {
-    const grid = $('image-grid'); 
+    const grid = $('image-grid');
     grid.innerHTML = '';
-    
-    imageGallery.forEach((img, i) => { 
-        const p = document.createElement('div'); p.id = `img-pill-${i}`; p.className = `pill-btn ${selectedImageIndexes.has(i) ? 'active' : ''}`; p.textContent = `Image ${i + 1}`; 
-        p.onclick = () => { 
-            selectedImageIndexes.has(i) ? selectedImageIndexes.delete(i) : selectedImageIndexes.add(i); 
-            p.classList.toggle('active'); updateCarousel(i); updateMainDownloadButton(); 
-        }; 
-        grid.appendChild(p); 
+
+    imageGallery.forEach((_, i) => {
+        const pill = document.createElement('div');
+        pill.id = `img-pill-${i}`;
+        pill.className = `pill-btn ${selectedImageIndexes.has(i) ? 'active' : ''}`;
+        pill.textContent = `Image ${i + 1}`;
+        pill.onclick = () => {
+            if (selectedImageIndexes.has(i)) selectedImageIndexes.delete(i);
+            else selectedImageIndexes.add(i);
+            pill.classList.toggle('active');
+            updateCarousel(i);
+            updateMainDownloadButton();
+        };
+        grid.appendChild(pill);
     });
-    
-    if (imageGallery.length > 1) { 
-        const allP = document.createElement('div'); allP.className = 'pill-btn'; allP.textContent = 'Select All'; allP.style.border = '1px dashed var(--accent)'; 
-        allP.onclick = () => { 
-            const selAll = selectedImageIndexes.size !== imageGallery.length; 
-            selectedImageIndexes.clear(); 
-            imageGallery.forEach((_, i) => { 
-                if (selAll) selectedImageIndexes.add(i); $(`img-pill-${i}`).classList.toggle('active', selAll); 
-            }); 
-            allP.classList.toggle('active', selAll); updateMainDownloadButton(); 
-        }; 
-        grid.appendChild(allP); 
+
+    if (imageGallery.length > 1) {
+        const allPill = document.createElement('div');
+        allPill.className = 'pill-btn';
+        allPill.textContent = 'Select All';
+        allPill.style.borderStyle = 'dashed';
+        allPill.style.borderColor = 'var(--accent)';
+        allPill.onclick = () => {
+            const selectAll = selectedImageIndexes.size !== imageGallery.length;
+            selectedImageIndexes.clear();
+            imageGallery.forEach((_, i) => {
+                if (selectAll) selectedImageIndexes.add(i);
+                $(`img-pill-${i}`).classList.toggle('active', selectAll);
+            });
+            allPill.classList.toggle('active', selectAll);
+            updateMainDownloadButton();
+        };
+        grid.appendChild(allPill);
     }
     updateMainDownloadButton();
 };
 
-const renderImageUI = formats => { 
-    imageGallery = formats; currentImageIndex = 0; selectedImageIndexes = new Set([0]); 
-    $('carousel-prev').style.visibility =$('carousel-next').style.visibility = formats.length > 1 ? 'visible' : 'hidden'; 
-    $('carousel-prev').onclick = () => currentImageIndex > 0 && updateCarousel(currentImageIndex - 1);$('carousel-next').onclick = () => currentImageIndex < imageGallery.length - 1 && updateCarousel(currentImageIndex + 1); 
-    updateCarousel(0); renderImageGrid(); 
+const renderImageUI = formats => {
+    imageGallery = formats;
+    currentImageIndex = 0;
+    selectedImageIndexes = new Set(formats.length ? [0] : []);
+
+    const visibility = formats.length > 1 ? 'visible' : 'hidden';
+    $('carousel-prev').style.visibility = visibility;
+    $('carousel-next').style.visibility = visibility;
+    $('carousel-prev').onclick = () => currentImageIndex > 0 && updateCarousel(currentImageIndex - 1);
+    $('carousel-next').onclick = () => currentImageIndex < imageGallery.length - 1 && updateCarousel(currentImageIndex + 1);
+
+    updateCarousel(0);
+    renderImageGrid();
 };
+
+/* ---------- Start downloads ----------
+   The server accepts the task and returns immediately. Progress, cancel and
+   errors for a running task live in the Downloads drawer (sidebar.js). */
+
+const openDownloadsDrawer = () => $('beans-downloads-button')?.click();
 
 const triggerDownload = async () => {
     if (!activeMedia) {
@@ -407,18 +251,9 @@ const triggerDownload = async () => {
         return;
     }
     clearError();
-    if (activePoller) clearInterval(activePoller);
 
     const btn = $('download-btn');
-    const pBox = $('progress-box');
-    const pFill = $('progress-fill');
-    const pStatus = $('progress-status');
-    const pPercent = $('progress-percent');
-    if (btn) btn.style.display = 'none';
-    if (pBox) pBox.style.display = 'block';
-    if (pFill) pFill.style.width = '2%';
-    if (pPercent) pPercent.textContent = '0%';
-    if (pStatus) pStatus.textContent = 'Initializing download...';
+    if (btn) btn.disabled = true;
 
     try {
         const response = await fetch('/api/download', {
@@ -428,127 +263,40 @@ const triggerDownload = async () => {
         });
         const data = await getJsonResponse(response);
         if (!data.success || !data.task_id) throw new Error(data.error || 'Failed to start download.');
-        activeTaskId = data.task_id;
 
-        cancelRequestedByUI = false;
-
-        // Accepted tasks move to Downloads immediately; later failures remain attached to that task.
         resetToPhase2();
-        document.getElementById('beans-downloads-button')?.click();
-        return;
-
-        let isSettled = false;
-        const stopPolling = () => {
-            if (activePoller) clearInterval(activePoller);
-            activePoller = null;
-        };
-        const checkTask = async () => {
-            if (isSettled) return;
-            try {
-                const progressResponse = await fetch(`/api/progress/${data.task_id}`, { cache: 'no-store' });
-                const state = await getJsonResponse(progressResponse);
-                const status = String(state.status || '').toLowerCase();
-                const rawPercent = state.percent ?? state.progress ?? '0%';
-                const numericPercent = typeof rawPercent === 'string'
-                    ? (parseFloat(rawPercent) || 0)
-                    : (Number(rawPercent) || 0);
-                const percentText = `${Math.min(100, Math.max(0, numericPercent))}%`;
-
-                if (status === 'downloading') {
-                    if (pFill) pFill.style.width = percentText;
-                    if (pPercent) pPercent.textContent = percentText;
-                    if (pStatus) {
-                        let message = 'Downloading media...';
-                        if (state.speed) message += ` ${state.speed}`;
-                        if (state.eta) message += ` • ETA ${state.eta}`;
-                        pStatus.textContent = message;
-                    }
-                } else if (['merging', 'processing'].includes(status)) {
-                    if (pFill) pFill.style.width = '100%';
-                    if (pPercent) pPercent.textContent = '100%';
-                    if (pStatus) pStatus.textContent = selectedFormat.mode === 'mp3'
-                        ? 'Converting audio and embedding cover...' : 'Processing video...';
-                } else if (status === 'fallback') {
-                    if (pStatus) pStatus.textContent = 'Normal download failed — trying HLS as a last resort...';
-                } else if (status === 'subtitles') {
-                    if (pStatus) pStatus.textContent = 'Downloading subtitle...';
-                } else if (status === 'embedding') {
-                    if (pStatus) pStatus.textContent = 'Embedding subtitles...';
-                } else if (status === 'finalizing') {
-                    if (pStatus) pStatus.textContent = 'Finalizing file...';
-                } else if (status === 'cancelling') {
-                    if (pStatus) pStatus.textContent = 'Stopping download and keeping resumable partial files...';
-                } else if (status === 'cancelled') {
-                    isSettled = true;
-                    stopPolling();
-                    activeTaskId = null;
-                    if (!cancelRequestedByUI) showError(state.error || 'Download was cancelled.');
-                    return;
-                } else if (status === 'completed') {
-                    isSettled = true;
-                    stopPolling();
-                    activeTaskId = null;
-                    if (pFill) pFill.style.width = '100%';
-                    if (pPercent) pPercent.textContent = '100%';
-                    if (pStatus) pStatus.textContent = state.subtitle_notice || 'Download complete!';
-                    setTimeout(resetToPhase2, state.subtitle_notice ? 4500 : 2200);
-                } else if (['failed', 'error'].includes(status)) {
-                    stopPolling();
-                    activeTaskId = null;
-                    // Let the catch block below update the UI and show the real error.
-                    throw new Error(state.error || 'Download failed.');
-                } else if (status === 'starting') {
-                    if (pStatus) pStatus.textContent = 'Starting Exractor...';
-                }
-            } catch (err) {
-                if (isSettled) return;
-                isSettled = true;
-                stopPolling();
-                showError(err.message || 'Lost connection to the download worker.');
-                if (btn) btn.style.display = 'block';
-                if (pBox) pBox.style.display = 'none';
-            }
-        };
-
-        // Poll immediately and continue at a modest interval.
-        await checkTask();
-        if (!isSettled) activePoller = setInterval(checkTask, 800);
+        openDownloadsDrawer();
     } catch (err) {
-        if (btn) btn.style.display = 'block';
-        if (pBox) pBox.style.display = 'none';
         showError(err.message || 'Failed to start download.');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 };
-
 
 const triggerImageDownload = async () => {
     if (!activeMedia) {
         showError('No media has been analyzed yet.');
         return;
     }
-
     clearError();
 
     const indexes = Array.from(selectedImageIndexes).sort((a, b) => a - b);
-
     if (!indexes.length) {
         showError('No images selected.');
         return;
     }
 
-    // Capture everything before resetting the UI.
+    // Capture everything before the UI is reset.
     const pageUrl = activeMedia.original_url;
-    const selectedImages = indexes.map(i => ({
+    const images = indexes.map(i => ({
         index: i,
         format_id: imageGallery[i].format_id,
         image_url: imageGallery[i].url
     }));
 
-    const btn = $('dl-selected-btn');
-    if (btn) btn.disabled = true;
-
-    // Start each image request in the background.
-    const backgroundDownloads = selectedImages.map(async image => {
+    // The server saves each image straight into the download folder (no browser
+    // download step), and records success or failure in the Downloads drawer.
+    images.forEach(async image => {
         try {
             const response = await fetch('/api/download', {
                 method: 'POST',
@@ -560,131 +308,38 @@ const triggerImageDownload = async () => {
                     image_url: image.image_url
                 })
             });
-
-            const data = await getJsonResponse(response);
-
-            if (!data.success) {
-                console.error(
-                    `Image ${image.index + 1} failed:`,
-                    data.error
-                );
-                return;
-            }
-
-            // Preserve the existing behavior of saving through the app.
-            if (data.task_id) {
-                const a = document.createElement('a');
-                a.href = `/api/serve/${data.task_id}`;
-                a.download = '';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            }
+            await getJsonResponse(response);
         } catch (err) {
             console.error(`Image ${image.index + 1} download failed:`, err);
         }
     });
 
-    // Reset immediately; the requests continue independently.
     resetToPhase2();
-    document.getElementById('beans-downloads-button')?.click();
-
-    if (btn) btn.disabled = false;
-
-    // Keep track of background errors without blocking the home screen.
-    Promise.allSettled(backgroundDownloads).then(results => {
-        const failed = results.filter(
-            result => result.status === 'rejected'
-        ).length;
-
-        if (failed) {
-            console.error(`${failed} image download request(s) failed.`);
-        }
-    });
+    openDownloadsDrawer();
 };
-
 
 const resetToPhase2 = () => {
-    if (activePoller) clearInterval(activePoller);
-    activePoller = null;
-    activeTaskId = null;
-    cancelRequestedByUI = false;
     activeMedia = null;
+    imageGallery = [];
+    selectedImageIndexes = new Set();
     clearError();
 
-    if ($('phase-2')) $('phase-2').style.display = 'block';
-    if ($('phase-3')) $('phase-3').style.display = 'none';
-    if ($('download-btn')) $('download-btn').style.display = 'block';
-    if ($('dl-selected-btn')) $('dl-selected-btn').style.display = 'block';
-    if ($('progress-box')) $('progress-box').style.display = 'none';
-    if ($('url-input')) {
-        $('url-input').value = '';
-        $('url-input').focus();
+    $('phase-2').style.display = 'block';
+    $('phase-3').style.display = 'none';
+    if ($('download-btn')) $('download-btn').disabled = false;
+
+    const input = $('url-input');
+    if (input) {
+        input.value = '';
+        input.focus();
     }
 };
 
-// Called by the Cancel & Extract Another button. The input screen is not
-// re-enabled until the backend confirms that the worker has actually stopped.
-const cancelAndExtractAnother = async () => {
-    const taskId = activeTaskId;
-    if (!taskId) {
-        resetToPhase2();
-        return;
-    }
-
-    const cancelButton = document.querySelector('.cancel-btn');
-    if (cancelButton) {
-        cancelButton.disabled = true;
-        cancelButton.textContent = 'Cancelling...';
-    }
-    cancelRequestedByUI = true;
-    if ($('progress-status')) $('progress-status').textContent = 'Stopping download and keeping resumable partial files...';
-
-    try {
-        const cancelResponse = await fetch('/api/cancel', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ task_id: taskId })
-        });
-        const cancelData = await getJsonResponse(cancelResponse);
-        if (!cancelData.success) throw new Error(cancelData.error || 'The backend could not cancel this task.');
-
-        const deadline = Date.now() + 60000;
-        while (Date.now() < deadline) {
-            const progressResponse = await fetch(`/api/progress/${taskId}`, { cache: 'no-store' });
-            const state = await getJsonResponse(progressResponse);
-            const status = String(state.status || '').toLowerCase();
-
-            if (['cancelled', 'failed', 'error', 'completed'].includes(status)) {
-                activeTaskId = null;
-                if (status === 'completed') {
-                    showError('The download completed just before cancellation took effect. Its completed file was kept.');
-                }
-                resetToPhase2();
-                return;
-            }
-            await new Promise(resolve => setTimeout(resolve, 250));
-        }
-
-        // Do not allow another task to start while the old worker may still be active.
-        throw new Error('Cancellation was requested, but the downloader has not confirmed it stopped yet. Keep this window open and try again once cancellation finishes.');
-    } catch (err) {
-        showError(err.message || 'Unable to cancel the download.');
-    } finally {
-        cancelRequestedByUI = false;
-        if (cancelButton) {
-            cancelButton.disabled = false;
-            cancelButton.textContent = 'Cancel & Extract Another';
-        }
-    }
-};
-
-window.addEventListener('message', e => { 
-    if (e.data?.theme) { document.documentElement.setAttribute('data-theme', e.data.theme); localStorage.setItem('theme', e.data.theme); } 
-});
+/* ---------- Paste context menu ---------- */
 
 const ctx = document.createElement('div');
-ctx.className = 'context-menu'; ctx.textContent = '📋 Paste';
+ctx.className = 'context-menu';
+ctx.textContent = '📋 Paste';
 document.body.appendChild(ctx);
 
 $('url-input')?.addEventListener('contextmenu', e => {
@@ -692,61 +347,53 @@ $('url-input')?.addEventListener('contextmenu', e => {
     ctx.style.cssText = `display: block; left: ${e.pageX}px; top: ${e.pageY}px;`;
 });
 
-document.addEventListener('click', e => e.target !== ctx && (ctx.style.display = 'none'));
+document.addEventListener('click', e => {
+    if (e.target !== ctx) ctx.style.display = 'none';
+});
 
 ctx.addEventListener('click', async () => {
-    try { $('url-input').value = await navigator.clipboard.readText(); } 
-    catch { showError('Clipboard access denied.'); }
+    try {
+        $('url-input').value = await navigator.clipboard.readText();
+    } catch {
+        showError('Clipboard access denied.');
+    }
     ctx.style.display = 'none';
 });
 
-// Open Settings Modal and fetch current configuration from backend.
-// Open Settings Modal and fetch current configuration from backend.
+/* ---------- Settings ---------- */
+
+const updateSubtitleLanguageVisibility = () => {
+    const group = $('settings-subtitle-language-group');
+    if (group) group.style.display = $('settings-include-subtitles')?.checked ? 'flex' : 'none';
+};
+
 const openSettingsModal = async () => {
-    ensureSubtitleSettingsUI();
+    let loadError = null;
 
     try {
         const response = await fetch('/api/settings', { cache: 'no-store' });
         const data = await getJsonResponse(response);
+        const config = data.config || {};
 
-        if (data.success) {
-            // Support both {config:{...}} and direct settings response shapes.
-            const config = data.config || data;
-
-            if ($('setting-download-dir')) {
-                $('setting-download-dir').value = config.download_dir || '';
-                updateDownloadDirPreview(); // ADDED: update destination preview
-            }
-
-            if ($('settings-include-subtitles')) {
-                $('settings-include-subtitles').checked =
-                    config.include_subtitles === true;
-            }
-
-            if ($('settings-subtitle-language')) {
-                $('settings-subtitle-language').value =
-                    config.subtitle_language || 'en';
-            }
-
-            updateSubtitleLanguageVisibility();
-        }
+        $('setting-download-dir').value = config.download_dir || '';
+        $('settings-include-subtitles').checked = config.include_subtitles === true;
+        $('settings-subtitle-language').value = config.subtitle_language || 'en';
     } catch (err) {
         console.error('Failed to load settings', err);
-        showError(err.message || 'Failed to load settings.');
+        loadError = err.message || 'Failed to load settings.';
     }
 
-    if ($('settings-modal')) {
-        $('settings-modal').style.display = 'flex';
-    }
+    updateSubtitleLanguageVisibility();
+    $('settings-modal').style.display = 'flex';
+    if (loadError) showError(loadError);
 };
 
-// Close Settings Modal.
 const closeSettingsModal = () => {
+    clearError();
     if ($('settings-modal')) $('settings-modal').style.display = 'none';
-    if ($('cookie-upload-status')) $('cookie-upload-status').innerText = '';
+    if ($('cookie-upload-status')) $('cookie-upload-status').textContent = '';
 };
 
-// Save download directory and subtitle preferences together.
 const saveSettings = async () => {
     const download_dir = $('setting-download-dir')?.value.trim() || '';
     if (!download_dir) {
@@ -754,16 +401,17 @@ const saveSettings = async () => {
         return;
     }
 
-    const saveButton = $('settings-save-btn') || $('save-settings-btn');
+    const saveButton = $('settings-save-btn');
     if (saveButton) saveButton.disabled = true;
+
     try {
         const response = await fetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 download_dir,
-                include_subtitles: $('settings-include-subtitles')?.checked === true,
-                subtitle_language: $('settings-subtitle-language')?.value || 'en'
+                include_subtitles: $('settings-include-subtitles').checked === true,
+                subtitle_language: $('settings-subtitle-language').value || 'en'
             })
         });
         const data = await getJsonResponse(response);
@@ -777,11 +425,16 @@ const saveSettings = async () => {
     }
 };
 
-// Upload manual cookies.txt file fallback
 const uploadCookiesFile = async () => {
     const fileInput = $('setting-cookies-file');
+    const status = $('cookie-upload-status');
+    const setStatus = (text, color) => {
+        status.textContent = text;
+        status.style.color = color;
+    };
+
     if (!fileInput.files.length) {
-        alert('Please select a cookies.txt file first.');
+        setStatus('Please select a cookies.txt file first.', 'var(--error-text)');
         return;
     }
 
@@ -789,73 +442,38 @@ const uploadCookiesFile = async () => {
     formData.append('file', fileInput.files[0]);
 
     try {
-        const res = await fetch('/api/cookies', {
-            method: 'POST',
-            body: formData
-        });
-        const data = await getJsonResponse(res);
-        if (data.success) {
-            $('cookie-upload-status').innerText = 'Uploaded successfully!';
-        } else {
-            $('cookie-upload-status').style.color = '#f44336';
-            $('cookie-upload-status').innerText = 'Upload failed: ' + data.error;
-        }
+        const response = await fetch('/api/cookies', { method: 'POST', body: formData });
+        const data = await getJsonResponse(response);
+        if (!data.success) throw new Error(data.error || 'Upload failed.');
+        setStatus('Uploaded successfully!', 'var(--success)');
     } catch (err) {
         console.error('Cookie upload error', err);
+        setStatus(`Upload failed: ${err.message}`, 'var(--error-text)');
     }
 };
 
-// Open the native folder picker and select the final download directory.
+// The backend appends/validates the "Beans Extractor" folder name, so use its answer as-is.
 const selectFolder = async () => {
     try {
-        const response = await fetch('/api/select-folder', {
-            method: 'POST'
-        });
-
+        const response = await fetch('/api/select-folder', { method: 'POST' });
         const data = await getJsonResponse(response);
-
         if (data.cancelled) return;
-
-        const folder = data.path || data.folder;
-
-        if (data.success && folder && $('setting-download-dir')) {
-            const normalizedFolder = folder.replace(/[\\/]+$/, '');
-
-            const destination = /[\\/]Beans Extractor$/i.test(normalizedFolder)
-                ? normalizedFolder
-                : `${normalizedFolder}\\Beans Extractor`;
-
-            $('setting-download-dir').value = destination;
-
-            updateDownloadDirPreview();
-        }
+        if (data.success && data.path) $('setting-download-dir').value = data.path;
     } catch (err) {
         console.error('Failed to open folder dialog', err);
         showError(err.message || 'Could not open folder selector.');
     }
 };
 
-const updateDownloadDirPreview = () => {
-    const input = $('setting-download-dir');
-    const preview = $('download-dir-preview');
-
-    if (!input || !preview) return;
-
-    const destination = input.value.trim();
-    preview.textContent = destination
-        ? `Downloads will be saved to: ${destination}`
-        : '';
-};
-
 window.addEventListener('DOMContentLoaded', () => {
-    ensureSubtitleSettingsUI();
-    ['subtitle-section', 'enable-subtitles', 'subtitle-lang-select', 'download-subtitles-btn'].forEach(id => {
-        const element = $(id);
-        if (element) element.style.display = 'none';
-    });
+    $('settings-include-subtitles')?.addEventListener('change', updateSubtitleLanguageVisibility);
+    updateSubtitleLanguageVisibility();
 });
 
-// Expose settings functions for sidebar buttons
+// Functions used by inline onclick handlers in the HTML.
+window.triggerDownload = triggerDownload;
+window.triggerImageDownload = triggerImageDownload;
+window.resetToPhase2 = resetToPhase2;
 window.openSettingsModal = openSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
 window.saveSettings = saveSettings;
