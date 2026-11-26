@@ -116,15 +116,6 @@ Beans-Extractor/
     └── sidebar.css           # Design tokens, sidebar, drawer, settings
 ```
 
-## Troubleshooting
-
-**The app will not start.** Run `python app.py` in PowerShell and read the error. Check `python --version` and reinstall the requirements.
-
-**A link fails to extract or download.** Make sure it opens in your browser. Then open **Settings → About → Downloader engine** and update it, or run `python -m pip install --upgrade yt-dlp gallery-dl`. If the content needs a login, add a `cookies.txt` in Settings.
-
-**TikTok or similar sites fail.** These need browser impersonation. Make sure `curl_cffi` is installed (it is part of `requirements.txt`).
-
-**Merging or converting fails.** Check that FFmpeg works: run `ffmpeg -version` in a new terminal. The installed app bundles its own copy.
 
 ## Licence
 
