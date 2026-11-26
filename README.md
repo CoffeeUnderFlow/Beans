@@ -1,136 +1,142 @@
-# Beans Extractor
+<p align="center">
+  <img src="assets/logo.png" alt="Beans Extractor logo" width="128" height="128">
+</p>
+
+<h1 align="center">Beans Extractor</h1>
 
 <p align="center">
-  <strong>A modern, lightweight Windows desktop media-downloading application built with Python, Flask, pywebview, yt-dlp, and gallery-dl.</strong>
+  <strong>Paste a link. Get the file.</strong><br>
+  A free, open-source media downloader for Windows: video, audio and images from almost anywhere.
 </p>
 
 <p align="center">
+  <a href="https://github.com/CoffeeUnderFlow/Beans-Extractor/releases/latest">Download</a> &bull;
   <a href="#features">Features</a> &bull;
-  <a href="#requirements">Requirements</a> &bull;
-  <a href="#installation-running-from-source">Installation</a> &bull;
-  <a href="#basic-usage">Usage</a> &bull;
+  <a href="#using-it">Using it</a> &bull;
+  <a href="#run-from-source">Run from source</a> &bull;
+  <a href="#build-the-installer">Build</a> &bull;
   <a href="#troubleshooting">Troubleshooting</a>
 </p>
 
 ---
 
-> **⚠️ Legal Notice:** Only download content you own, have permission to download, or are otherwise legally allowed to save. Respect each website's terms of service and creators' intellectual property rights.
+> **Legal notice:** Only download content you own, have permission to download, or are otherwise legally allowed to save. Respect each website's terms of service and creators' rights.
 
 ---
 
-## 🌟 Features
+## Download
 
-- **Modern Desktop UI:** Clean interface built with HTML, CSS, and JavaScript, powered natively via `pywebview`.
-- **URL Inspection:** Preview and analyze supported media links before starting any download.
-- **Resolution Control:** Choose from available video resolutions or select the best-quality option.
-- **Audio Extraction:** Download high-quality audio tracks (e.g., MP3) with automated metadata and cover-art tagging where supported.
-- **Image Gallery Support:** Detect and download supported multi-image galleries effortlessly using `gallery-dl`.
-- **Subtitle Integration:** Optional subtitle downloading and embedding with preferred language selection.
-- **Progress & Cancellation:** Real-time progress feedback and cancellation support for running tasks.
-- **Persistent Settings:** Remembers user configurations, theme preferences, download destinations, and recent URL history between sessions.
-- **Cookie Support:** Optional `cookies.txt` integration for accessing private or authenticated content securely.
-- **FFmpeg Integration:** Seamless media merging, container conversion, and subtitle embedding.
+Get **BeansExtractor_Setup.exe** from the [latest release](https://github.com/CoffeeUnderFlow/Beans-Extractor/releases/latest) and run it. It installs for the current user only (no administrator rights needed) and includes everything the app needs, including FFmpeg.
 
-*Supported sites and formats depend on underlying tools (`yt-dlp` and `gallery-dl`), website updates, and account access. Not every URL is guaranteed to work.*
+Requires Windows 10 or 11 (64-bit).
 
----
+## Features
 
-## 📁 Project Structure
+- **Preview before you download.** Paste a link and see the title, thumbnail and available formats first.
+- **Video, audio and images.** Pick a resolution, extract MP3 audio with tags and cover art, or choose images from a gallery.
+- **Subtitles.** Optionally download and embed subtitles in your preferred language.
+- **Queue and progress.** Live progress, cancel, retry failed downloads, and a history that never deletes your files.
+- **Stays up to date.** Checks for new app versions and can update its downloader engine (yt-dlp) from inside the app, because sites change often.
+- **Private by design.** Everything runs on your PC. The app only contacts the sites you paste, plus GitHub and PyPI for update checks.
+- **Cookies.** Optional `cookies.txt` (Netscape format) for content that needs you to be signed in.
+- **Dark and light themes.**
 
-The repository maintains the following standard file layout:
+Supported sites depend on [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [gallery-dl](https://github.com/mikf/gallery-dl) and on the sites themselves. Not every link is guaranteed to work.
 
-```text
-media-extractor-app/
-├── app.py                 # Flask backend and pywebview bridge
-├── requirements.txt       # Python package dependencies
-├── .gitignore             # Excluded files (caches, downloads, credentials)
-├── templates/
-│   └── index.html         # Main user interface template
-└── static/
-    ├── main.js            # Core frontend logic
-    ├── sidebar.js         # Navigation and layout controllers
-    ├── style.css          # Primary styling rules
-    └── sidebar.css        # Sidebar layout styling
-```
+## Using it
 
----
+1. Open Beans Extractor.
+2. Paste a media link and press **Extract**.
+3. Choose a format: a video resolution, audio only (MP3), or the images you want.
+4. Press **Download**. Progress shows in the Downloads panel.
+5. Use **Settings** to change the download folder, subtitles, theme or cookies.
 
-## 🛠️ Requirements
+Right-click the link field for a quick **Paste**.
 
-- **Operating System:** Windows 10 or Windows 11
-- **Python:** Python 3.10 or newer recommended
-- **Core Python Packages:** `Flask`, `pywebview`, `yt-dlp`, `gallery-dl`
-- **External Binary:** FFmpeg (required for video/audio merging, format conversion, and subtitle embedding)
+## Your data
 
----
-
-## 🚀 Installation (Running from Source)
-
-1. **Install Python:** Download and install Python from [python.org](https://www.python.org/downloads/). Ensure you check the box to **Add Python to PATH**.
-2. **Install FFmpeg:** Install FFmpeg and make sure `ffmpeg` and `ffprobe` are accessible from your command line terminal.
-3. **Clone or Open Repository:** Open Command Prompt or PowerShell inside the project directory.
-4. **Install Python Dependencies:**
-   ```powershell
-   python -m pip install --upgrade pip
-   python -m pip install -r requirements.txt
-   ```
-   *(Alternatively, install packages individually: `python -m pip install Flask pywebview yt-dlp gallery-dl`)*
-5. **Launch the Application:**
-   ```powershell
-   python app.py
-   ```
-
----
-
-## 💡 Basic Usage
-
-1. Launch Beans Extractor.
-2. Paste your target media URL into the input field.
-3. Click **Analyze Media** to inspect available formats.
-4. Choose your preferred format:
-   - For video: Select your desired resolution or best quality.
-   - For audio: Select the audio/MP3 option.
-   - For galleries: Pick the desired images from the extracted list.
-5. Hit **Download** and track live progress in the app window.
-6. Open **Settings** to customize your download directory or configure subtitles.
-
----
-
-## ⚙️ Settings & Stored Data
-
-Persistent configuration files and history logs are securely stored in your Windows roaming profile directory:
+Settings and history are stored separately from the program, in:
 
 ```text
 %APPDATA%\Beans Extractor\
 ```
 
-- `settings.json` — User preferences and application settings.
-- `url_history.json` — History of recently inspected URLs.
-- `download_history.json` — Record of past download tasks.
-- `cookies.txt` — Optional authentication cookies file (kept strictly private).
+| File | Purpose |
+|---|---|
+| `settings.json` | Preferences |
+| `url_history.json` | Recently extracted links |
+| `download_history.json` | Past downloads |
+| `cookies.txt` | Optional sign-in cookies (keep private) |
+
+Reinstalling or updating the app keeps this folder. Delete it if you want a clean start.
+
+## Run from source
+
+Requirements: Windows 10/11, Python 3.10 or newer, and FFmpeg (`ffmpeg` and `ffprobe`) available on your PATH, or placed next to `app.py`.
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python app.py
+```
+
+`requirements.txt` installs the Python dependencies, including `yt-dlp[curl-cffi]` (needed for sites such as TikTok that check for a real browser).
+
+## Build the installer
+
+You need [PyInstaller](https://pyinstaller.org/) and [Inno Setup](https://jrsoftware.org/isinfo.php).
+
+```powershell
+python -m PyInstaller BeansExtractor.spec --noconfirm --clean
+```
+
+This creates `dist\BeansExtractor\`. Then open `installer.iss` in Inno Setup and compile it to get `BeansExtractor_Setup.exe`. Place `ffmpeg.exe` (and `ffprobe.exe` if you have it) in the project folder before building so they are bundled.
+
+## Project layout
+
+```text
+Beans-Extractor/
+├── app.py                    # Flask backend and pywebview window
+├── requirements.txt
+├── BeansExtractor.spec       # PyInstaller build
+├── installer.iss             # Inno Setup installer
+├── icon.ico                  # App icon
+├── LICENSE                   # GPL-2.0-only
+├── THIRD_PARTY_NOTICES.md    # Licences of bundled components
+├── licenses/
+│   └── GPL-3.0.txt           # Licence of the bundled FFmpeg build
+├── assets/                   # Logo and images for this README
+├── templates/
+│   ├── index.html            # Main screen
+│   └── sidebar.html          # Sidebar, downloads panel, settings
+└── static/
+    ├── main.js               # Core front-end logic
+    ├── sidebar.js            # Navigation, drawer, settings
+    ├── style.css             # Home and format panel styles
+    └── sidebar.css           # Design tokens, sidebar, drawer, settings
+```
+
+## Troubleshooting
+
+**The app will not start.** Run `python app.py` in PowerShell and read the error. Check `python --version` and reinstall the requirements.
+
+**A link fails to extract or download.** Make sure it opens in your browser. Then open **Settings → About → Downloader engine** and update it, or run `python -m pip install --upgrade yt-dlp gallery-dl`. If the content needs a login, add a `cookies.txt` in Settings.
+
+**TikTok or similar sites fail.** These need browser impersonation. Make sure `curl_cffi` is installed (it is part of `requirements.txt`).
+
+**Merging or converting fails.** Check that FFmpeg works: run `ffmpeg -version` in a new terminal. The installed app bundles its own copy.
+
+## Licence
+
+Beans Extractor is licensed under **GPL-2.0-only**. See [LICENSE](LICENSE).
+It uses and ships other software under their own licences, including FFmpeg (GPL-3.0-or-later), gallery-dl (GPL-2.0), and yt-dlp (Unlicense). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Disclaimer
+
+Provided as is, without warranty. Extractors and websites change often. You are responsible for following the law, each site's terms, and content copyright.
 
 ---
 
-## 🔧 Troubleshooting
-
-### The application fails to start
-- Run `python app.py` directly in PowerShell to check error outputs.
-- Verify your Python installation using `python --version`.
-- Re-run the dependency installation commands.
-
-### Extraction or download fails
-- Verify that the target URL is accessible in your web browser.
-- Update your downloader components to the latest versions:
-  ```powershell
-  python -m pip install --upgrade yt-dlp gallery-dl
-  ```
-- If authentication is required, verify that your `cookies.txt` file is correctly configured.
-
-### Video merging or conversion errors
-- Ensure FFmpeg is installed and test it by running `ffmpeg -version` in a fresh terminal window.
-
----
-
-## 🛡️ Disclaimer
-
-Beans Extractor is provided as-is, without warranty of any kind. Web scrapers, extractors, and target websites change frequently. Users are entirely responsible for ensuring compliance with local laws, website terms of service, and content copyright restrictions.
+<p align="center">
+  Made by <a href="https://coffeeunderflow.in/">CoffeeUnderFlow</a>
+</p>

@@ -28,7 +28,7 @@
             <form id="inspect-form" class="input-group">
                 <input type="text" id="url-input" placeholder="Paste video or media link..." required autofocus>
                 <button type="submit" id="inspect-btn" class="btn-primary">
-                    <span id="btn-text">Analyze</span>
+                    <span id="btn-text">Extract</span>
                     <div class="loader-dots" id="btn-loader" style="display: none;">
                         <span></span><span></span><span></span><span></span>
                     </div>
@@ -49,11 +49,11 @@
                     </div>
                 </div>
 
-                <p class="section-label">Select Output Format</p>
+                <p class="section-label">Format</p>
                 <div id="quality-grid" class="quality-grid"></div>
 
                 <button id="download-btn" class="btn-primary" onclick="triggerDownload()">
-                    Download Stream
+                    Download
                 </button>
             </div>
 
@@ -69,7 +69,7 @@
                         aria-label="Next image">&#8594;</button>
                 </div>
 
-                <p class="section-label">Select Images to Download</p>
+                <p class="section-label">Choose Images</p>
                 <div id="image-grid" class="quality-grid"></div>
 
                 <button id="dl-selected-btn" class="btn-primary" onclick="triggerImageDownload()">
@@ -79,7 +79,7 @@
 
             <!-- Progress is shown in the Downloads drawer, so this just returns to step 1. -->
             <button class="btn-secondary cancel-btn" onclick="resetToPhase2()">
-                Extract Another
+                Cancel
             </button>
         </div>
     </div>

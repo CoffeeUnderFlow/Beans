@@ -30,6 +30,9 @@ const showError = msg => {
     if (settingsOpen() && $('settings-error')) {
         $('settings-error').textContent = text;
         $('settings-error').hidden = false;
+    } else if (window.beansToast) {
+        window.beansToast(text, 'error', 7000);
+        return;
     } else if ($('error-banner')) {
         $('error-banner').textContent = text;
         $('error-banner').style.display = 'block';
@@ -47,7 +50,9 @@ const getJsonResponse = async response => {
         throw new Error(`Backend returned invalid JSON (HTTP ${response.status})`);
     }
     if (!response.ok) {
-        throw new Error(data?.error || `Backend request failed (HTTP ${response.status})`);
+        const error = new Error(data?.error || `Backend request failed (HTTP ${response.status})`);
+        error.code = data?.code;
+        throw error;
     }
     return data;
 };
@@ -63,6 +68,30 @@ const formatDuration = value => {
         : `${m}:${String(s).padStart(2, '0')}`;
 };
 
+/* ---------- Connection status ----------
+   The browser's online flag can say "online" on a dead wifi, so the backend is asked as well. */
+
+let offlineTimer = null;
+const setOfflineBanner = on => { if ($('beans-offline')) $('beans-offline').hidden = !on; };
+const clearOffline = () => {
+    setOfflineBanner(false);
+    clearInterval(offlineTimer);
+    offlineTimer = null;
+};
+const checkOnline = async () => {
+    try {
+        const data = await (await fetch('/api/ping', { cache: 'no-store' })).json();
+        if (data.online) clearOffline();
+    } catch { /* keep the banner */ }
+};
+const markOffline = () => {
+    setOfflineBanner(true);
+    if (!offlineTimer) offlineTimer = setInterval(checkOnline, 4000);
+};
+window.addEventListener('offline', markOffline);
+window.addEventListener('online', checkOnline);
+if (navigator.onLine === false) markOffline();
+
 /* ---------- Step 1: inspect URL ---------- */
 
 $('inspect-form')?.addEventListener('submit', async e => {
@@ -74,7 +103,13 @@ $('inspect-form')?.addEventListener('submit', async e => {
     const btn = $('inspect-btn');
 
     if (!url) {
-        showError('Please enter a media URL.');
+        showError('Paste a link first.');
+        return;
+    }
+
+    if (navigator.onLine === false) {
+        markOffline();
+        showError('No internet connection. Check your network and try again.');
         return;
     }
 
@@ -84,11 +119,15 @@ $('inspect-form')?.addEventListener('submit', async e => {
         $('btn-loader').style.display = 'flex';
     }
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+
     try {
         const response = await fetch('/api/inspect', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ url }),
+            signal: controller.signal
         });
         const data = await getJsonResponse(response);
         if (!data.success || !data.data) throw new Error(data.error || 'Failed to extract metadata.');
@@ -100,9 +139,15 @@ $('inspect-form')?.addEventListener('submit', async e => {
         renderDashboard(activeMedia);
     } catch (err) {
         console.error('[Inspect] Error:', err);
-        showError(err.message || 'Failed to contact engine.');
+        if (err.name === 'AbortError') {
+            showError('This is taking too long. Check your connection and try again.');
+        } else {
+            if (err.code === 'offline') markOffline();
+            showError(err.message || 'Failed to contact engine.');
+        }
         input?.select();
     } finally {
+        clearTimeout(timer);
         if (btn) {
             btn.disabled = false;
             $('btn-text').style.display = 'inline';
@@ -163,7 +208,7 @@ const renderVideoUI = media => {
         selectedFormat = { mode: 'video', height: null };
     }
 
-    addPill('Audio (MP3 + Cover)', 'pill-btn audio', pill => selectPill(pill, 'mp3', null));
+    addPill('Audio·MP3', 'pill-btn audio', pill => selectPill(pill, 'mp3', null));
 };
 
 /* ---------- Image gallery ---------- */
@@ -247,7 +292,7 @@ const openDownloadsDrawer = () => $('beans-downloads-button')?.click();
 
 const triggerDownload = async () => {
     if (!activeMedia) {
-        showError('No media has been analyzed yet.');
+        showError('Paste a link first.');
         return;
     }
     clearError();
@@ -339,27 +384,47 @@ const resetToPhase2 = () => {
 
 const ctx = document.createElement('div');
 ctx.className = 'context-menu';
-ctx.textContent = '📋 Paste';
+ctx.setAttribute('role', 'menu');
+ctx.innerHTML = '<button type="button" class="context-item" role="menuitem">Paste</button>';
 document.body.appendChild(ctx);
 
+const hideCtx = () => { ctx.style.display = 'none'; };
+
+// Like the iOS edit menu: a small capsule floating just above the pointer.
 $('url-input')?.addEventListener('contextmenu', e => {
     e.preventDefault();
-    ctx.style.cssText = `display: block; left: ${e.pageX}px; top: ${e.pageY}px;`;
+    ctx.style.display = 'block';
+    const w = ctx.offsetWidth, h = ctx.offsetHeight;
+    let x = e.clientX - w / 2;
+    let y = e.clientY - h - 14;
+    if (y < 8) y = e.clientY + 18;
+    x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+    ctx.style.left = `${x}px`;
+    ctx.style.top = `${y}px`;
 });
 
-document.addEventListener('click', e => {
-    if (e.target !== ctx) ctx.style.display = 'none';
-});
+document.addEventListener('click', e => { if (!ctx.contains(e.target)) hideCtx(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtx(); });
+window.addEventListener('blur', hideCtx);
 
+// Paste reads the clipboard through the app itself (no browser permission prompt);
+// the browser clipboard API is only a fallback.
 ctx.addEventListener('click', async () => {
+    hideCtx();
+    const input = $('url-input');
     try {
-        $('url-input').value = await navigator.clipboard.readText();
+        const data = await getJsonResponse(await fetch('/api/clipboard', { cache: 'no-store' }));
+        input.value = (data.text || '').trim();
+        input.focus();
+        return;
+    } catch { /* fall back below */ }
+    try {
+        input.value = (await navigator.clipboard.readText()).trim();
+        input.focus();
     } catch {
-        showError('Clipboard access denied.');
+        showError('Could not read the clipboard. Try Ctrl+V instead.');
     }
-    ctx.style.display = 'none';
 });
-
 /* ---------- Settings ---------- */
 
 const updateSubtitleLanguageVisibility = () => {

@@ -1,5 +1,23 @@
+# Beans Extractor — Copyright (C) 2026 CoffeeUnderFlow. Licensed under the GNU GPL v2. See LICENSE.
+
 import os
 import sys
+
+# Helper mode: the installed .exe also runs gallery-dl (see extract_images).
+# This must stay at the very top, before any other startup code, so the helper
+# process never touches the app's history or starts a window.
+if len(sys.argv) > 1 and sys.argv[1] == '--gallery-dl':
+    import io
+    for _name, _fd in (('stdout', 1), ('stderr', 2)):
+        try:
+            setattr(sys, _name, io.TextIOWrapper(io.FileIO(_fd, 'w', closefd=False),
+                                                  encoding='utf-8', errors='replace', line_buffering=True))
+        except OSError:
+            setattr(sys, _name, io.StringIO())
+    sys.argv = ['gallery-dl'] + sys.argv[2:]
+    import gallery_dl
+    sys.exit(gallery_dl.main())
+
 import time
 import uuid
 import threading
@@ -10,9 +28,71 @@ import json
 import hashlib
 from pathlib import Path
 import webview
-import yt_dlp
+
+# ---- Downloader engine (yt-dlp) override ------------------------------------
+# A newer yt-dlp wheel in ENGINE_DIR is loaded instead of the bundled one.
+ENGINE_DIR = os.path.join(
+    os.environ.get('APPDATA', os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming')),
+    'Beans Extractor', 'engine'
+)
+
+
+def _engine_wheels():
+    """Wheel paths in ENGINE_DIR, newest first (by modification time)."""
+    try:
+        names = [n for n in os.listdir(ENGINE_DIR) if n.startswith('yt_dlp-') and n.endswith('.whl')]
+    except OSError:
+        return []
+    paths = [os.path.join(ENGINE_DIR, n) for n in names]
+    paths.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+    return paths
+
+
+def _wheel_version(path):
+    """'yt_dlp-2026.10.28-py3-none-any.whl' -> '2026.10.28'."""
+    return os.path.basename(path).split('-')[1] if path else None
+
+
+_wheels = _engine_wheels()
+_engine_wheel = _wheels[0] if _wheels else None
+for _old in _wheels[1:]:  # keep only the newest; older ones are not loaded
+    try:
+        os.remove(_old)
+    except OSError:
+        pass
+ENGINE_STARTUP_WHEEL_VERSION = _wheel_version(_engine_wheel)
+ENGINE_SOURCE = 'bundled'
+
+if _engine_wheel:
+    sys.path.insert(0, _engine_wheel)
+try:
+    import yt_dlp
+    if _engine_wheel and os.path.abspath(getattr(yt_dlp, '__file__', '') or '').startswith(os.path.abspath(_engine_wheel)):
+        ENGINE_SOURCE = 'updated'
+except Exception:
+    # Broken update: discard it and fall back to the copy bundled with the app.
+    if not _engine_wheel:
+        raise
+    sys.path.remove(_engine_wheel)
+    for _name in [m for m in sys.modules if m == 'yt_dlp' or m.startswith('yt_dlp.')]:
+        del sys.modules[_name]
+    try:
+        os.remove(_engine_wheel)
+    except OSError:
+        pass
+    ENGINE_STARTUP_WHEEL_VERSION = None
+    import yt_dlp
+ENGINE_VERSION = str(getattr(getattr(yt_dlp, 'version', None), '__version__', 'unknown'))
 import gallery_dl
 from flask import Flask, render_template, request, jsonify, send_from_directory
+import urllib.error
+
+# Single source of truth for the version shown in Settings > About.
+# Keep installer.iss (AppVersion) in step with this when you release.
+APP_VERSION = '1.0.0'
+# Placeholder repository: change to your real GitHub "owner/name" before release.
+GITHUB_REPO = 'CoffeeUnderFlow/beans-extractor'
+UPDATE_API_URL = f'https://api.github.com/repos/{GITHUB_REPO}/releases/latest'
 
 # 1. ==============================    PATH RESOLUTION & DIRECTORY SETUP   ==========================================
 
@@ -166,6 +246,106 @@ def _url_key(url):
         return raw
 
 
+ERROR_MESSAGES = {
+    'offline': 'No internet connection. Check your network and try again.',
+    'timeout': 'The connection timed out.',
+    'connection': 'The connection was interrupted.',
+    'private': 'This video is private.',
+    'age_restricted': 'Age-restricted. Upload cookies in Settings.',
+    'login': 'Sign-in required. Upload cookies in Settings.',
+    'geo': 'Not available in your region.',
+    'rate_limited': 'Too many requests. Try again later.',
+    'unavailable': 'This media is unavailable or was removed.',
+    'unsupported': "This link isn't supported.",
+    'disk': 'Disk is full or the folder is not writable.',
+    'unknown': 'Download failed.',
+}
+
+# Checked in order: the first group with a matching phrase wins.
+_ERROR_PATTERNS = (
+    ('unsupported', ('unsupported url',)),
+    ('private', ('private video', 'is private')),
+    ('age_restricted', ('age-restricted', 'age restricted', 'confirm your age', 'inappropriate for some users')),
+    ('login', ('sign in to confirm', 'login required', 'requires authentication', '--cookies', "not a bot")),
+    ('geo', ('your country', 'geo restriction', 'geo-restrict', 'not available in your region')),
+    ('rate_limited', ('http error 429', 'too many requests')),
+    ('unavailable', ('video unavailable', 'has been removed', 'no longer available', 'does not exist', 'http error 404', 'has been terminated')),
+    ('disk', ('no space left', 'disk full', 'permission denied', 'errno 28')),
+    ('offline', ('getaddrinfo', 'name or service not known', 'temporary failure in name resolution', 'network is unreachable', 'no route to host', 'nodename nor servname', 'failed to resolve', 'name resolution')),
+    ('timeout', ('timed out', 'timeout')),
+    ('connection', ('connection reset', 'connection aborted', 'connection refused', 'remote end closed', 'remotedisconnected', 'incompleteread', 'newconnectionerror', 'eof occurred')),
+)
+
+
+def strip_ansi(value):
+    """Remove terminal colour codes (yt-dlp errors contain them)."""
+    if value is None:
+        return None
+    import re
+    return re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', str(value)).strip()
+
+
+def classify_error(raw):
+    """Return {'code': ..., 'message': ...} for a raw error string."""
+    text = (strip_ansi(raw) or '').lower()
+    for code, phrases in _ERROR_PATTERNS:
+        if any(phrase in text for phrase in phrases):
+            return {'code': code, 'message': ERROR_MESSAGES[code]}
+    return {'code': 'unknown', 'message': ERROR_MESSAGES['unknown']}
+
+
+def is_online(timeout=2.0):
+    """True when a public host accepts a TCP connection quickly."""
+    import socket
+    for host, port in (('1.1.1.1', 443), ('8.8.8.8', 443)):
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def read_clipboard_text():
+    """Read plain text from the system clipboard (no browser permission prompt)."""
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        user32.OpenClipboard.argtypes = [wintypes.HWND]
+        user32.OpenClipboard.restype = wintypes.BOOL
+        user32.GetClipboardData.argtypes = [wintypes.UINT]
+        user32.GetClipboardData.restype = wintypes.HANDLE
+        kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalLock.restype = wintypes.LPVOID
+        kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        if not user32.OpenClipboard(None):
+            raise RuntimeError('The clipboard is busy.')
+        try:
+            handle = user32.GetClipboardData(13)  # CF_UNICODETEXT
+            if not handle:
+                return ''
+            pointer = kernel32.GlobalLock(handle)
+            if not pointer:
+                return ''
+            try:
+                return ctypes.wstring_at(pointer)
+            finally:
+                kernel32.GlobalUnlock(handle)
+        finally:
+            user32.CloseClipboard()
+    import tkinter
+    root = tkinter.Tk()
+    root.withdraw()
+    try:
+        return root.clipboard_get()
+    except tkinter.TclError:
+        return ''
+    finally:
+        root.destroy()
+
+
 def update_url_history(url, title='Unknown title', duration=0, thumbnail=''):
     key = _url_key(url)
     if not key:
@@ -196,12 +376,15 @@ def upsert_download_history(task):
         'title': str(task.get('title') or task.get('url') or 'Media download'),
         'mode': str(task.get('mode') or 'video'),
         'height': task.get('height'),
+        'format_id': task.get('format_id'),
+        'image_url': task.get('image_url'),
+        'cache_key': task.get('cache_key'),
         'status': str(task.get('status') or 'starting'),
         'percent': str(task.get('percent') or '0%'),
         'overall_percent': str(task.get('overall_percent') or task.get('percent') or '0%'),
         'subtitles_embedded': bool(task.get('subtitles_embedded')),
         'filename': task.get('filename'),
-        'error': task.get('error'),
+        'error': strip_ansi(task.get('error')),
         'subtitle_notice': task.get('subtitle_notice'),
         'timestamp': task.get('timestamp') or now,
         'updated_at': now,
@@ -209,6 +392,13 @@ def upsert_download_history(task):
     with HISTORY_LOCK:
         records = _read_json_list(DOWNLOAD_HISTORY_FILE)
         records = [item for item in records if item.get('task_id') != record['task_id']]
+        stale = {'failed', 'error', 'cancelled', 'interrupted'}
+        if record.get('cache_key') and record['status'] not in stale:
+            records = [
+                item for item in records
+                if not (item.get('cache_key') == record['cache_key']
+                        and str(item.get('status', '')).lower() in stale)
+            ]
         records.insert(0, record)
         _write_json_atomic(DOWNLOAD_HISTORY_FILE, records[:HISTORY_LIMIT])
 
@@ -245,6 +435,172 @@ def raise_if_cancelled(task_id):
 
 
 # 3. ==============================     CANCELLATION ENDPOINT      =====================================================
+def _version_tuple(text):
+    """'v1.2.3-beta' -> (1, 2, 3). Missing parts count as 0."""
+    parts = []
+    for piece in str(text or '').strip().lstrip('vV').split('-')[0].split('.'):
+        digits = ''.join(ch for ch in piece if ch.isdigit())
+        parts.append(int(digits or 0))
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
+
+@app.route('/api/update-check')
+def api_update_check():
+    """Ask GitHub for the latest release. Never downloads or installs anything."""
+    request_obj = urllib.request.Request(UPDATE_API_URL, headers={
+        'User-Agent': f'BeansExtractor/{APP_VERSION}',
+        'Accept': 'application/vnd.github+json',
+    })
+    try:
+        with urllib.request.urlopen(request_obj, timeout=6) as response:
+            release = json.loads(response.read().decode('utf-8'))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return jsonify({'success': True, 'current': APP_VERSION, 'latest': APP_VERSION,
+                            'update_available': False, 'note': 'No releases published yet.'})
+        return jsonify({'success': False, 'error': 'Could not reach the update server.'}), 502
+    except (urllib.error.URLError, OSError, ValueError):
+        return jsonify({'success': False, 'error': 'Could not check for updates. Are you online?'}), 502
+
+    latest = str(release.get('tag_name') or '').lstrip('vV')
+    page = str(release.get('html_url') or '')
+    if not latest or not page.startswith('https://github.com/'):
+        return jsonify({'success': False, 'error': 'The update server sent an unexpected reply.'}), 502
+
+    return jsonify({
+        'success': True,
+        'current': APP_VERSION,
+        'latest': latest,
+        'update_available': _version_tuple(latest) > _version_tuple(APP_VERSION),
+        'url': page,
+    })
+
+
+def _engine_tuple(text):
+    parts = []
+    for piece in str(text or '').split('.'):
+        digits = ''.join(ch for ch in piece if ch.isdigit())
+        parts.append(int(digits or 0))
+    return tuple(parts)
+
+
+@app.route('/api/engine')
+def api_engine():
+    """Which yt-dlp is running, and whether a newer one is waiting for a restart."""
+    wheels = _engine_wheels()
+    staged = _wheel_version(wheels[0]) if wheels else None
+    return jsonify({
+        'success': True,
+        'version': ENGINE_VERSION,
+        'source': ENGINE_SOURCE,
+        'pending_restart': bool(staged and staged != ENGINE_VERSION and staged != ENGINE_STARTUP_WHEEL_VERSION),
+        'staged_version': staged,
+        # A wheel that existed at launch but is not the running copy did not take effect.
+        'failed': bool(ENGINE_STARTUP_WHEEL_VERSION and ENGINE_SOURCE != 'updated'),
+    })
+
+
+def _fetch_pypi_release():
+    """Latest yt-dlp wheel info from PyPI: (version, wheel_url, sha256, filename, size)."""
+    import re
+    request_obj = urllib.request.Request('https://pypi.org/pypi/yt-dlp/json', headers={
+        'User-Agent': f'BeansExtractor/{APP_VERSION}', 'Accept': 'application/json'})
+    with urllib.request.urlopen(request_obj, timeout=8) as response:
+        data = json.loads(response.read().decode('utf-8'))
+    version = str(data['info']['version'])
+    for entry in data.get('urls', []):
+        name = str(entry.get('filename', ''))
+        url = str(entry.get('url', ''))
+        if (entry.get('packagetype') == 'bdist_wheel'
+                and re.fullmatch(r'yt_dlp-[0-9][0-9.]*-py3-none-any\.whl', name)
+                and url.startswith('https://files.pythonhosted.org/')):
+            return version, url, str(entry['digests']['sha256']), name, int(entry.get('size') or 0)
+    raise ValueError('No suitable yt-dlp wheel found.')
+
+
+@app.route('/api/engine/check')
+def api_engine_check():
+    try:
+        latest, _url, _sha, _name, _size = _fetch_pypi_release()
+    except (urllib.error.URLError, OSError):
+        return jsonify({'success': False, 'error': 'Could not check for updates. Are you online?'}), 502
+    except (ValueError, KeyError, TypeError):
+        return jsonify({'success': False, 'error': 'The update server sent an unexpected reply.'}), 502
+    wheels = _engine_wheels()
+    have = _wheel_version(wheels[0]) if wheels else None
+    newest_known = max([ENGINE_VERSION, have or ''], key=_engine_tuple)
+    return jsonify({'success': True, 'current': ENGINE_VERSION, 'latest': latest,
+                    'update_available': _engine_tuple(latest) > _engine_tuple(newest_known)})
+
+
+@app.route('/api/engine/update', methods=['POST'])
+def api_engine_update():
+    """Download + verify the newest yt-dlp wheel. It is used after the next restart."""
+    import hashlib as _hashlib
+    import zipfile
+    try:
+        latest, url, sha256, name, size = _fetch_pypi_release()
+        if size > 25 * 1024 * 1024:
+            raise ValueError('Download is unexpectedly large.')
+        with urllib.request.urlopen(urllib.request.Request(
+                url, headers={'User-Agent': f'BeansExtractor/{APP_VERSION}'}), timeout=30) as response:
+            blob = response.read(25 * 1024 * 1024 + 1)
+    except (urllib.error.URLError, OSError):
+        return jsonify({'success': False, 'error': 'Download failed. Are you online?'}), 502
+    except (ValueError, KeyError, TypeError) as exc:
+        return jsonify({'success': False, 'error': str(exc) or 'The update server sent an unexpected reply.'}), 502
+
+    if len(blob) > 25 * 1024 * 1024 or _hashlib.sha256(blob).hexdigest() != sha256:
+        return jsonify({'success': False, 'error': 'The download failed its integrity check.'}), 502
+
+    os.makedirs(ENGINE_DIR, exist_ok=True)
+    target = os.path.join(ENGINE_DIR, name)
+    temp = target + '.part'
+    try:
+        with open(temp, 'wb') as handle:
+            handle.write(blob)
+        with zipfile.ZipFile(temp) as archive:
+            if 'yt_dlp/__init__.py' not in archive.namelist():
+                raise ValueError('The downloaded file is not a yt-dlp package.')
+        os.replace(temp, target)
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        try:
+            os.remove(temp)
+        except OSError:
+            pass
+        return jsonify({'success': False, 'error': f'Could not save the update: {exc}'}), 500
+
+    return jsonify({'success': True, 'version': latest, 'restart_required': True})
+
+
+@app.route('/api/restart', methods=['POST'])
+def api_restart():
+    """Relaunch Beans Extractor. The reply is sent first, then this process exits."""
+    def relaunch():
+        time.sleep(0.6)  # let the HTTP response reach the page
+        # Installed .exe: start itself. Running from source: python + absolute script path.
+        target = [sys.executable] if getattr(sys, 'frozen', False) else [sys.executable, os.path.abspath(sys.argv[0])]
+        env = dict(os.environ, BEANS_RESTARTED='1')
+        try:
+            if os.name == 'nt':
+                DETACHED_PROCESS, CREATE_NEW_PROCESS_GROUP = 0x00000008, 0x00000200
+                subprocess.Popen(target, env=env, cwd=os.path.dirname(os.path.abspath(target[-1])),
+                                 creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+                                 close_fds=True)
+            else:
+                subprocess.Popen(target, env=env, cwd=os.path.dirname(os.path.abspath(target[-1])),
+                                 start_new_session=True, close_fds=True)
+        except OSError as exc:
+            print(f'Restart failed: {exc}')
+            return
+        os._exit(0)
+
+    threading.Thread(target=relaunch, daemon=True).start()
+    return jsonify({'success': True})
+
+
 ALLOWED_HOSTS = {'127.0.0.1:5000', 'localhost:5000'}
 
 
@@ -361,17 +717,22 @@ def find_program(name):
     if os.name == 'nt' and not name.lower().endswith('.exe'):
         executable_names.insert(0, name + '.exe')
 
-    for candidate_name in executable_names:
-        path = shutil.which(candidate_name)
-        if path and os.path.isfile(path):
-            return os.path.abspath(path)
-
+    # The copy shipped with the app comes first, so the version we tested (and listed in
+    # THIRD_PARTY_NOTICES.md) is the one that runs. PATH is only a fallback.
     search_dirs = [BASE_DIR, os.path.dirname(sys.executable)]
+    internal = os.path.join(os.path.dirname(sys.executable), '_internal')
+    if os.path.isdir(internal):
+        search_dirs.append(internal)
     for directory in search_dirs:
         for candidate_name in executable_names:
             path = os.path.join(directory, candidate_name)
             if os.path.isfile(path):
                 return os.path.abspath(path)
+
+    for candidate_name in executable_names:
+        path = shutil.which(candidate_name)
+        if path and os.path.isfile(path):
+            return os.path.abspath(path)
     return None
 
 def get_base_opts():
@@ -379,6 +740,7 @@ def get_base_opts():
     opts = {
         'noplaylist': True,
         'nocheckcertificate': True,
+        'socket_timeout': 15,
         # Match yt-dlp CLI's resumable .part behavior.
         'continuedl': True,
         'nopart': False,
@@ -396,12 +758,15 @@ def extract_images(url):
     """Extract image URLs with gallery-dl, excluding obvious video streams."""
     from urllib.parse import urlsplit, parse_qs
 
-    executable = shutil.which('gallery-dl')
-
-    if executable:
-        command = [executable, '-g', url]
+    if getattr(sys, 'frozen', False):
+        # Installed app: run the gallery-dl bundled inside this exe (handled at the top of app.py).
+        command = [sys.executable, '--gallery-dl', '-g', url]
     else:
-        command = [sys.executable, '-m', 'gallery_dl', '-g', url]
+        executable = shutil.which('gallery-dl')
+        if executable:
+            command = [executable, '-g', url]
+        else:
+            command = [sys.executable, '-m', 'gallery_dl', '-g', url]
 
     if os.environ.get('USE_PROXY', 'false').lower() == 'true':
         command.extend([
@@ -767,7 +1132,9 @@ def api_inspect():
 
     except Exception as exc:
         ytdlp_error = str(exc)
-        print(f'[Inspect] yt-dlp could not inspect URL: {ytdlp_error}')
+        print(f'[Inspect] yt-dlp could not inspect URL: {strip_ansi(ytdlp_error)}')
+        if classify_error(ytdlp_error)['code'] in ('offline', 'timeout', 'connection') and not is_online():
+            return jsonify({'success': False, 'code': 'offline', 'error': ERROR_MESSAGES['offline']}), 503
 
     # A successful metadata response may still have no video formats.
     video_formats = []
@@ -817,13 +1184,11 @@ def api_inspect():
 
         # If yt-dlp itself failed, report a useful combined error.
         if info is None:
-            message = (
-                'Could not find supported video or images at this URL. '
-                'The link may be unsupported, private, or require authentication.'
-            )
-
-            if ytdlp_error:
-                message += f'\nyt-dlp: {ytdlp_error}'
+            failure = classify_error(ytdlp_error)
+            if failure['code'] != 'unknown':
+                return jsonify({'success': False, 'code': failure['code'], 'error': failure['message']}), 400
+            print(f'[Inspect] yt-dlp error: {strip_ansi(ytdlp_error or "")}')
+            message = "Couldn't read this link. It may be unsupported, private, or need sign-in."
 
             return jsonify({
                 'success': False,
@@ -1037,7 +1402,7 @@ def download_gallery_image(url, format_id, image_url=None):
 
         if not images:
             raise RuntimeError(
-                'No images found. Please analyze the URL again.'
+                'No images found. Please extract the link again.'
             )
 
         try:
@@ -1048,7 +1413,7 @@ def download_gallery_image(url, format_id, image_url=None):
         if index < 0 or index >= len(images):
             raise RuntimeError(
                 'The selected image is no longer available. '
-                'Please analyze the URL again.'
+                'Please extract the URL again.'
             )
 
         selected_url = images[index]
@@ -1160,6 +1525,8 @@ def api_download():
             'mode': 'image',
             'height': 0,
             'format_id': format_id,
+            'image_url': data.get('image_url'),
+            'cache_key': 'image|' + url + '|' + str(data.get('image_url') or format_id),
             'status': 'starting',
             'percent': '0%',
             'overall_percent': '0%',
@@ -1662,8 +2029,12 @@ def api_select_folder():
 @app.route('/api/history/urls', methods=['GET', 'DELETE'])
 def api_url_history():
     if request.method == 'DELETE':
+        data = request.get_json(silent=True) or {}
+        target = _url_key(data.get('url')) if data.get('url') else ''
         with HISTORY_LOCK:
-            _write_json_atomic(URL_HISTORY_FILE, [])
+            kept = [item for item in _read_json_list(URL_HISTORY_FILE)
+                    if _url_key(item.get('url')) != target] if target else []
+            _write_json_atomic(URL_HISTORY_FILE, kept)
         return jsonify({'success': True})
     with HISTORY_LOCK:
         return jsonify({'success': True, 'items': _read_json_list(URL_HISTORY_FILE)})
@@ -1685,8 +2056,46 @@ def api_download_history():
             snapshot = active.get(item.get('task_id'))
             if snapshot:
                 item.update({key: snapshot.get(key) for key in ('status', 'percent', 'overall_percent', 'title', 'filename', 'error', 'subtitle_notice', 'subtitles_embedded')})
+    for item in items:
+        item['error'] = strip_ansi(item.get('error'))
+        if item.get('error') and str(item.get('status', '')).lower() in ('failed', 'error'):
+            reason = classify_error(item['error'])
+            item['error_code'] = reason['code']
+            item['error_short'] = reason['message']
     items.sort(key=lambda item: item.get('updated_at', item.get('timestamp', 0)), reverse=True)
     return jsonify({'success': True, 'items': items[:HISTORY_LIMIT]})
+
+
+@app.route('/api/history/downloads/<task_id>', methods=['DELETE'])
+def api_delete_download_record(task_id):
+    """Remove one finished download from history (never deletes the media file)."""
+    with TASKS_LOCK:
+        task = TASKS.get(task_id)
+        if task and str(task.get('status', '')).lower() not in TERMINAL_TASK_STATUSES:
+            return jsonify({'success': False, 'error': 'Cancel this download before removing it.'}), 409
+        TASKS.pop(task_id, None)
+    with HISTORY_LOCK:
+        records = _read_json_list(DOWNLOAD_HISTORY_FILE)
+        _write_json_atomic(DOWNLOAD_HISTORY_FILE, [item for item in records if item.get('task_id') != task_id])
+    return jsonify({'success': True})
+
+
+@app.route('/api/ping', methods=['GET'])
+def api_ping():
+    return jsonify({'success': True, 'online': is_online()})
+
+
+@app.route('/api/clipboard', methods=['GET'])
+def api_clipboard():
+    from urllib.parse import urlsplit
+    origin = request.headers.get('Origin')
+    if origin and urlsplit(origin).netloc not in ALLOWED_HOSTS:
+        return jsonify({'success': False, 'error': 'Cross-origin requests are not allowed.'}), 403
+    try:
+        text = read_clipboard_text() or ''
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 500
+    return jsonify({'success': True, 'text': text[:4096]})
 
 
 @app.route('/api/theme', methods=['GET', 'POST'])
@@ -1745,10 +2154,20 @@ def index():
             theme = json.load(handle).get('theme', 'dark')
     except (OSError, ValueError, TypeError, AttributeError):
         theme = 'dark'
-    return render_template('index.html', theme=theme if theme in ('dark', 'light') else 'dark')
+    return render_template('index.html', app_version=APP_VERSION,
+                           theme=theme if theme in ('dark', 'light') else 'dark')
 
 if __name__ == '__main__':
     import threading
+
+    if os.environ.get('BEANS_RESTARTED'):
+        # Restarted by the app itself: wait for the previous copy to release port 5000.
+        import socket as _socket
+        for _ in range(100):
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as probe:
+                if probe.connect_ex(('127.0.0.1', 5000)) != 0:
+                    break
+            time.sleep(0.1)
 
     flask_thread = threading.Thread(
         target=lambda: app.run(

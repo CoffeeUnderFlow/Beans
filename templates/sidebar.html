@@ -71,15 +71,18 @@
                  aria-label="Recent links">
             <div class="beans-sidebar-section-head">
                 <span>Recent links</span>
-                <button id="beans-clear-urls" type="button" title="Clear URL history">
-                    Clear all
-                </button>
             </div>
 
             <div id="beans-url-list" class="beans-url-list">
                 <div class="beans-empty-state">
                     Your analyzed URLs will appear here.
                 </div>
+            </div>
+
+            <div class="beans-list-footer">
+                <button type="button" class="beans-info" data-tip="Clears saved links only." aria-label="More information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>
+
+                <button id="beans-clear-urls" class="beans-clear-btn" type="button">Clear all</button>
             </div>
         </section>
 
@@ -104,6 +107,7 @@
     <!-- MAIN WORKSPACE -->
     <main class="beans-workspace">
         <header class="beans-topbar">
+            <div id="beans-offline" class="beans-offline" role="status" hidden>No internet connection</div>
             <button id="beans-top-downloads" class="beans-top-downloads"
                     type="button" aria-label="Downloads" title="Downloads">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -140,29 +144,17 @@
             </button>
         </header>
 
-        <!-- Active downloads -->
-        <div id="beans-download-active" class="beans-download-active"></div>
-
-        <!-- Finished downloads (filled by sidebar.js) -->
-        <div id="beans-download-list" class="beans-download-list"></div>
+        <!-- One scrolling body: in-progress work first, finished items below -->
+        <div id="beans-drawer-body" class="beans-drawer-body">
+            <div id="beans-download-active" class="beans-download-active"></div>
+            <div id="beans-download-list" class="beans-download-list"></div>
+        </div>
 
         <!-- Drawer footer -->
-        <div class="beans-drawer-list-head">
-            <div class="beans-info-tooltip" tabindex="0"
-                 aria-label="Clearing history never deletes downloaded files.">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                     aria-hidden="true">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <span class="beans-tooltip-text">
-                    Clearing history never deletes downloaded files.
-                </span>
-            </div>
+        <div class="beans-list-footer">
+            <button type="button" class="beans-info" data-tip="Clearing history never deletes downloaded files." aria-label="More information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>
 
-            <button id="beans-clear-downloads" type="button">Clear all</button>
+            <button id="beans-clear-downloads" class="beans-clear-btn" type="button">Clear all</button>
         </div>
 
     </aside>
@@ -174,13 +166,18 @@
 
         <header class="beans-modal-header">
             <h3 id="beans-settings-title">Settings</h3>
-            <button class="beans-modal-close" type="button"
-                    onclick="closeSettingsModal()" aria-label="Close settings">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            <button id="settings-close" class="beans-modal-close" type="button"
+                    onclick="settingsCloseOrBack()" aria-label="Close settings">
+                <svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                      aria-hidden="true">
                     <line x1="18" y1="6" x2="6" y2="18"/>
                     <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                <svg class="icon-back" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                    <polyline points="15 18 9 12 15 6"/>
                 </svg>
             </button>
         </header>
@@ -189,76 +186,48 @@
         <div class="beans-settings-tabs" role="tablist" aria-label="Settings sections">
             <button type="button" id="tab-btn-preferences" class="beans-tab-btn active" role="tab"
                     aria-selected="true" aria-controls="tab-preferences"
-                    onclick="switchSettingsTab('preferences', this)">
-                Preferences
-            </button>
-            <button type="button" id="tab-btn-more" class="beans-tab-btn" role="tab"
-                    aria-selected="false" aria-controls="tab-more"
-                    onclick="switchSettingsTab('more', this)">
-                More
-            </button>
+                    onclick="switchSettingsTab('preferences', this)">Preferences</button>
+            <button type="button" id="tab-btn-about" class="beans-tab-btn" role="tab"
+                    aria-selected="false" aria-controls="tab-about"
+                    onclick="switchSettingsTab('about', this)">About<i id="about-update-dot" class="beans-dot" hidden></i></button>
         </div>
 
-        <!-- Errors raised while the modal is open show here (the page banner is hidden behind the backdrop) -->
         <div id="settings-error" class="beans-modal-error" role="alert" hidden></div>
 
-        <!-- ==================== TAB 1: PREFERENCES ==================== -->
-        <div id="tab-preferences" class="beans-tab-panel active" role="tabpanel"
-             aria-labelledby="tab-btn-preferences">
+        <!-- ==================== PREFERENCES ==================== -->
+        <div id="tab-preferences" class="beans-tab-panel active" role="tabpanel" aria-labelledby="tab-btn-preferences">
 
-            <!-- Theme -->
             <div class="beans-settings-field">
                 <label for="beans-theme-toggle">Appearance</label>
-                <button id="beans-theme-toggle" class="beans-theme-switcher"
-                        type="button" title="Toggle theme">
+                <button id="beans-theme-toggle" class="beans-theme-switcher" type="button" title="Toggle theme">
                     <span class="beans-theme-left">
                         <span id="beans-theme-icon" class="beans-theme-icon-box" aria-hidden="true">☾</span>
-                        <span class="beans-theme-text">
-                            <strong id="beans-theme-label">Dark mode</strong>
-                            <small>Click to switch appearance</small>
-                        </span>
+                        <span class="beans-theme-text"><strong id="beans-theme-label">Dark mode</strong></span>
                     </span>
-                    <span class="beans-theme-switch">
-                        <i></i>
-                    </span>
+                    <span class="beans-theme-switch"><i></i></span>
                 </button>
             </div>
 
-            <!-- Download Directory -->
             <div class="beans-settings-field">
-                <label for="setting-download-dir">Download Directory</label>
+                <label for="setting-download-dir">Download folder <button type="button" class="beans-info" data-tip="Saved in a “Beans Extractor” folder inside this location." aria-label="More information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button></label>
                 <div class="beans-settings-inline">
                     <input type="text" id="setting-download-dir">
-                    <button type="button" class="beans-icon-button"
-                            onclick="selectFolder()" title="Browse folder" aria-label="Browse folder">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-                             stroke="currentColor" stroke-width="2"
-                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                        </svg>
+                    <button type="button" class="beans-icon-button" onclick="selectFolder()" title="Browse folder" aria-label="Browse folder">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                     </button>
                 </div>
-                <small class="beans-field-hint">
-                    Files are always saved in a “Beans Extractor” folder inside the chosen location.
-                </small>
             </div>
 
-            <!-- Subtitles -->
             <section id="subtitle-settings-block">
                 <div class="me-subtitle-row">
-                    <div>
-                        <div class="me-subtitle-title">Include Subtitles</div>
-                        <div class="me-subtitle-help">Optional. When off, no subtitle lookup, download or embedding is done.</div>
-                    </div>
+                    <div class="me-subtitle-title">Include subtitles <button type="button" class="beans-info" data-tip="When off, subtitles are never fetched or embedded." aria-label="More information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button></div>
                     <label class="me-subtitle-switch" aria-label="Include subtitles">
                         <input id="settings-include-subtitles" type="checkbox">
                         <span class="me-subtitle-slider"></span>
                     </label>
                 </div>
-
-                <div id="settings-subtitle-language-group"
-                     class="me-subtitle-language" style="display:none;">
-                    <label for="settings-subtitle-language">Subtitle language</label>
+                <div id="settings-subtitle-language-group" class="me-subtitle-language" style="display:none;">
+                    <label for="settings-subtitle-language">Subtitle language <button type="button" class="beans-info" data-tip="Creator subtitles first, auto-generated as fallback." aria-label="More information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button></label>
                     <select id="settings-subtitle-language">
                         <option value="en" selected>English</option>
                         <option value="hi">Hindi</option>
@@ -291,75 +260,67 @@
                         <option value="el">Greek</option>
                         <option value="he">Hebrew</option>
                     </select>
-                    <div class="me-subtitle-help">Only this language is used. Creator subtitles are preferred; auto-generated ones are the fallback.</div>
                 </div>
             </section>
-        </div>
 
-        <!-- ==================== TAB 2: MORE ==================== -->
-        <div id="tab-more" class="beans-tab-panel" role="tabpanel"
-             aria-labelledby="tab-btn-more">
-
-            <!-- Fallback Cookies -->
             <div class="beans-settings-field">
-                <label for="setting-cookies-file">Fallback Cookies File (cookies.txt)</label>
+                <label for="setting-cookies-file">Cookies file <button type="button" class="beans-info" data-tip="If a site blocks access, upload your browser’s cookies.txt. It stays on this computer." aria-label="More information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button></label>
                 <div class="beans-cookies-row">
-                    <input type="file" id="setting-cookies-file" accept=".txt">
-                    <button id="beans-upload-cookies" class="beans-settings-button"
-                            type="button" onclick="uploadCookiesFile()">
-                        Upload Cookies File
-                    </button>
+                    <input type="file" id="setting-cookies-file" accept=".txt" hidden>
+                    <button type="button" id="beans-choose-cookies" class="beans-settings-button">Choose file…</button>
+                    <span id="cookie-file-name" class="beans-file-name">No file chosen</span>
+                    <button id="beans-upload-cookies" class="beans-settings-button" type="button" onclick="uploadCookiesFile()">Upload</button>
                 </div>
                 <span id="cookie-upload-status" role="status"></span>
             </div>
+        </div>
 
-            <!-- Help Box -->
-            <div class="beans-settings-help">
-                <strong>Help:</strong>
-                If access to a media site fails, export your cookies as a text
-                file and upload it above as a fallback.
-            </div>
+        <!-- ==================== ABOUT ==================== -->
+        <div id="tab-about" class="beans-tab-panel" role="tabpanel" aria-labelledby="tab-btn-about">
 
-            <hr class="beans-settings-divider">
-
-            <!-- About & Info Card -->
             <div class="beans-about-card">
                 <div class="beans-about-header">
                     <div>
                         <h4 class="beans-app-name">Beans Extractor</h4>
-                        <p class="beans-app-tagline">Desktop Media Downloader</p>
+                        <p class="beans-app-tagline">Desktop Media Downloader · by CoffeeUnderFlow</p>
                     </div>
-                    <span class="beans-version-badge">v1.0.0</span>
+                    <span class="beans-version-badge">v<span id="app-version">{{ app_version|default('1.0.0') }}</span></span>
                 </div>
-
-                <div class="beans-about-meta">
-                    <div class="beans-meta-row">
-                        <span>Developed by</span>
-                        <strong>CoffeeUnderFlow</strong>
-                    </div>
-                    <div class="beans-meta-row">
-                        <span>Built with</span>
-                        <span>Python, Flask, yt-dlp &amp; gallery-dl</span>
-                    </div>
+                <div class="beans-update-row">
+                    <span id="update-status" class="beans-update-status" role="status">Check for a newer version.</span>
+                    <a id="update-download" class="beans-settings-button" href="#" target="_blank" rel="noopener noreferrer" hidden>Download</a>
+                    <button id="update-check" type="button" class="beans-settings-button">Check for updates</button>
                 </div>
-
-                <div class="beans-about-links">
-                    <a href="https://coffeeunderflow.in/" target="_blank" rel="noopener noreferrer" class="beans-link-pill">
-                        Website
-                    </a>
-                    <a href="https://github.com/CoffeeUnderFlow" target="_blank" rel="noopener noreferrer" class="beans-link-pill">
-                        Source
-                    </a>
-                    <a href="https://coffeeunderflow.in/" target="_blank" rel="noopener noreferrer" class="beans-link-pill">
-                        Get Help &amp; Report Bug
-                    </a>
+                <div class="beans-update-row">
+                    <div class="beans-update-status">
+                        <span class="beans-engine-title">Downloader engine <button type="button" class="beans-info" data-tip="yt-dlp, which reads each website. Keep it updated; applies after restart." aria-label="More information"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button></span>
+                        <span id="engine-status" class="beans-engine-sub" role="status">Checking…</span>
+                    </div>
+                    <button id="engine-action" type="button" class="beans-settings-button">Check</button>
                 </div>
             </div>
 
+            <div class="beans-group-list">
+                <button type="button" class="beans-row-link" data-legal="privacy"><span>Privacy Policy</span><svg class="beans-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+                <button type="button" class="beans-row-link" data-legal="terms"><span>Terms of Use</span><svg class="beans-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+                <button type="button" class="beans-row-link" data-legal="licenses"><span>Licenses</span><svg class="beans-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+            </div>
+
+            <div class="beans-group-list">
+                <a class="beans-row-link" href="https://coffeeunderflow.in/beans-extractor" target="_blank" rel="noopener noreferrer"><span>Website</span><svg class="beans-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></a>
+                <a class="beans-row-link" href="https://github.com/CoffeeUnderFlow/Beans-Extractor" target="_blank" rel="noopener noreferrer"><span>Source code</span><svg class="beans-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></a>
+                <a class="beans-row-link" href="https://github.com/CoffeeUnderFlow/Beans-Extractor/issues" target="_blank" rel="noopener noreferrer"><span>Report a problem</span><svg class="beans-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></a>
+            </div>
+        </div>
+
+        <!-- Legal pages open here (no tab button); Back returns to About -->
+        <div id="tab-legal" class="beans-tab-panel" role="tabpanel" aria-label="Legal">
+            <h4 id="legal-title" class="beans-legal-title"></h4>
+            <div id="legal-body" class="beans-legal-body"></div>
         </div>
 
         <!-- Actions (Shared Footer) -->
-        <footer class="beans-settings-actions">
+        <footer id="settings-actions" class="beans-settings-actions">
             <button type="button" class="beans-settings-button"
                     onclick="closeSettingsModal()">Cancel</button>
             <button id="settings-save-btn" type="button"
@@ -368,5 +329,46 @@
 
     </div>
 </div>
+
+<!-- Legal texts.-->
+<template id="legal-privacy">
+    <p><em>Last updated: November 2026.</em></p>
+    <h5>Your data stays on your computer</h5>
+    <p>Beans Extractor does not collect, store or send your personal data, links, downloads or settings to the developer or any third party. There are no accounts, analytics or advertising.</p>
+    <h5>What is stored locally</h5>
+    <p>Your settings, link history, download history and any cookies file you upload is saved only on your computer. “Clear all” removes the history entries; deleting the app’s data folder removes everything else.</p>
+    <h5>Connections the app makes</h5>
+    <p>When you paste a link, the app contacts that website (directly, from your computer) to read the media information and to download it. If you use “Check for updates”, it contacts GitHub to look up the latest release. Those services see your IP address like any website you visit and have their own privacy policies.</p>
+    <h5>Cookies file</h5>
+    <p>If you upload a cookies file (.txt) it is kept on your computer and only used when a site requires it. Treat it like a password: it can contain login sessions.</p>
+    <h5>Contact</h5>
+    <p>Questions: open an issue on the project’s GitHub page.</p>
+</template>
+
+<template id="legal-terms">
+    <p><em>Last updated: November 2026.</em></p>
+    <h5>Use at your own responsibility</h5>
+    <p>Beans Extractor is a tool for saving media. You are responsible for what you download and how you use it. Only download content you own, that is in the public domain, or that you have permission to save, and follow the terms of the websites you use and the laws where you live.</p>
+    <h5>No affiliation</h5>
+    <p>Beans Extractor is not affiliated with, endorsed by or sponsored by any website or service it can work with.</p>
+    <h5>No warranty</h5>
+    <p>The app is provided “as is”, without warranty of any kind. Websites change often and downloads may fail or stop working at any time. To the extent the law allows, the developer is not liable for any loss or damage arising from using the app.</p>
+    <h5>Open source</h5>
+    <p>Beans Extractor is free and open-source software. Its source code and the license that governs copying, changing and sharing it are published on the project’s GitHub page.</p>
+</template>
+
+<template id="legal-licenses">
+    <p>Beans Extractor is free software released under the <strong>GNU General Public License, version 2</strong> (GPL-2.0). The full license text is in the LICENSE file shipped with the app and in the source repository.</p>
+    <h5>Built with</h5>
+    <ul>
+        <li><strong>yt-dlp</strong> — Unlicense (public domain)</li>
+        <li><strong>gallery-dl</strong> — GPL-2.0</li>
+        <li><strong>FFmpeg</strong> — LGPL / GPL, depending on the build</li>
+        <li><strong>Flask</strong> — BSD-3-Clause</li>
+        <li><strong>pywebview</strong> — BSD-3-Clause</li>
+        <li><strong>Python</strong> — PSF License</li>
+    </ul>
+    <p>Each project is the work of its own authors and is used under its own license. Source code for the bundled programs is available from their official project pages.</p>
+</template>
 
 </div>

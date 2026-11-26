@@ -54,8 +54,8 @@ textarea:focus-visible,
 .beans-app-shell { position: fixed; inset: 0; display: flex; overflow: hidden; background: radial-gradient(1100px 520px at 62% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%), var(--bg-main); color: var(--text-main); }
 
 /* ---------- Sidebar ---------- */
-.beans-sidebar { display: flex; flex: 0 0 72px; flex-direction: column; width: 72px; min-width: 72px; min-height: 0; overflow: hidden; padding: 16px 10px 10px; border-right: 1px solid color-mix(in srgb, var(--text-main) 8%, transparent); background: color-mix(in srgb, var(--bg-card) 68%, transparent); -webkit-backdrop-filter: blur(30px) saturate(1.5); backdrop-filter: blur(30px) saturate(1.5); white-space: nowrap; z-index: 2; transition: width .35s cubic-bezier(.32, .72, 0, 1), flex-basis .35s cubic-bezier(.32, .72, 0, 1); }
-.beans-app-shell.sidebar-expanded .beans-sidebar { flex-basis: 240px; width: 240px; min-width: 240px; }
+.beans-sidebar { position: absolute; top: 0; left: 0; bottom: 0; display: flex; flex-direction: column; width: 72px; min-height: 0; overflow: hidden; padding: 16px 10px 10px; border-right: 1px solid color-mix(in srgb, var(--text-main) 8%, transparent); background: color-mix(in srgb, var(--bg-card) 72%, transparent); -webkit-backdrop-filter: blur(30px) saturate(1.5); backdrop-filter: blur(30px) saturate(1.5); white-space: nowrap; z-index: 20; transition: width .35s cubic-bezier(.32, .72, 0, 1), box-shadow .35s ease; }
+.beans-app-shell.sidebar-expanded .beans-sidebar { width: 240px; background: color-mix(in srgb, var(--bg-card) 88%, transparent); box-shadow: 12px 0 48px rgba(0, 0, 0, .35); }
 .beans-sidebar-actions { display: grid; gap: 5px; }
 .beans-nav-button { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 40px; padding: 9px 12px; border: 0; border-radius: 10px; background: transparent; color: var(--text-muted); text-align: left; font-size: 14px; font-weight: 500; letter-spacing: -.01em; cursor: pointer; transition: background .15s ease, color .15s ease; }
 .beans-nav-button:hover { background: var(--ctrl-bg); color: var(--text-main); }
@@ -75,15 +75,15 @@ textarea:focus-visible,
 .beans-menu-toggle svg { width: 26px; height: 26px; }
 
 .beans-sidebar-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-bottom: 12px; color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: .5px; }
-.beans-sidebar-section-head button { flex: 0 0 auto; margin-left: auto; padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
-.beans-sidebar-section-head button:hover { background: var(--hover-accent); color: var(--text-main); }
+
+
 
 /* URL history: hidden unless sidebar is expanded and history is active */
 .beans-sidebar-history-wrapper { display: none; }
-.beans-app-shell.sidebar-expanded.history-active .beans-sidebar-history-wrapper { display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0; margin-top: 14px; padding: 0 4px; overflow: hidden; }
+.beans-app-shell.sidebar-expanded.history-active .beans-sidebar-history-wrapper { display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0; margin-top: 14px; padding: 0 4px 10px; overflow: hidden; }
 .beans-url-list { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 40px; gap: 6px; padding-right: 2px; overflow-y: auto; }
-.beans-url-item { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-main); text-align: left; cursor: pointer; }
-.beans-url-item:hover { border-color: var(--border); background: var(--bg-input); }
+.beans-url-item { position: relative; display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 10px 30px 10px 10px; border-radius: 10px; background: transparent; color: var(--text-main); text-align: left; cursor: pointer; transition: background .15s, opacity .2s, transform .2s; }
+.beans-url-item:hover { background: var(--ctrl-bg-hover); }
 .beans-url-item-title,
 .beans-url-item-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .beans-url-item-title { font-size: 12px; font-weight: 600; }
@@ -99,8 +99,8 @@ textarea:focus-visible,
 .beans-sidebar-footer span { display: block; margin-top: 3px; opacity: .7; }
 
 /* ---------- Workspace and top bar ---------- */
-.beans-workspace { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; overflow: auto; }
-.beans-topbar { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; min-height: 56px; padding: 12px 24px; background: transparent; }
+.beans-workspace { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; margin-left: 72px; overflow: auto; }
+.beans-topbar { position: relative; display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; min-height: 56px; padding: 12px 24px; background: transparent; }
 .beans-page-eyebrow { margin-bottom: 4px; color: var(--accent); font-size: 9px; font-weight: 750; letter-spacing: 1.6px; }
 .beans-page-title { color: var(--text-main); font-size: 19px; font-weight: 650; letter-spacing: -.3px; }
 .beans-top-downloads { display: flex; align-items: center; justify-content: center; margin-left: auto; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; transition: background .15s, color .15s; }
@@ -137,39 +137,53 @@ textarea:focus-visible,
 .beans-active-bottom button:hover:not(:disabled) { background: var(--error-bg); color: var(--error-text); }
 .beans-active-bottom button:disabled { opacity: .5; cursor: default; }
 
-/* Finished downloads: one grouped list, rows split by hairlines */
+/* Finished downloads: one grouped list of fixed-height rows */
 .beans-download-list { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; margin-top: 18px; padding-bottom: 10px; overflow-y: auto; }
-.beans-download-item { display: flex; flex: 0 0 auto; gap: 12px; padding: 13px 14px; background: var(--ctrl-bg); }
+.beans-download-item { position: relative; display: flex; flex: 0 0 auto; align-items: center; gap: 10px; height: 58px; padding: 0 38px 0 14px; background: var(--ctrl-bg); transition: opacity .2s ease, transform .2s ease; }
 .beans-download-item:first-child { border-radius: 16px 16px 0 0; }
 .beans-download-item:last-child { border-radius: 0 0 16px 16px; }
 .beans-download-item:only-child { border-radius: 16px; }
 .beans-download-item + .beans-download-item { border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
-.beans-download-item-icon { display: flex; flex: 0 0 32px; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 9px; background: var(--ctrl-bg-hover); color: var(--text-muted); font-size: 14px; font-weight: 700; }
-.beans-download-item-icon.success { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
-.beans-download-item-icon.danger { background: var(--error-bg); color: var(--error-text); }
-.beans-download-item-icon.active { background: var(--accent-tint); color: var(--accent); }
-.beans-download-item-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
-.beans-download-item .beans-download-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.beans-download-item-meta { overflow-wrap: anywhere; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
-.beans-download-item-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; color: var(--text-muted); font-size: 11px; }
-.beans-status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--ctrl-bg-hover); color: var(--text-muted); font-size: 11px; font-weight: 600; }
-.beans-status-pill:empty { display: none; }
-.beans-status-pill.success { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
-.beans-status-pill.danger { background: var(--error-bg); color: var(--error-text); }
-.beans-status-pill.active { background: var(--accent-tint); color: var(--accent); }
-.beans-download-error,
-.beans-download-note { margin-top: 4px; overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }
-.beans-download-error { color: var(--error-text); }
-.beans-download-note { color: var(--text-muted); }
-.beans-download-actions { display: flex; gap: 6px; margin-top: 6px; }
-.beans-download-actions button { padding: 5px 12px; border: 0; border-radius: 999px; background: var(--ctrl-bg-hover); color: var(--text-main); font-size: 12px; font-weight: 500; cursor: pointer; transition: background .15s; }
-.beans-download-actions button:hover { background: color-mix(in srgb, var(--text-main) 16%, transparent); }
+.beans-download-item.is-failed { background: var(--error-bg); }
+.beans-download-item.is-removing,
+.beans-url-item.is-removing { opacity: 0; transform: translateX(10px); pointer-events: none; }
+.beans-download-item-main { display: flex; flex: 1 1 auto; flex-direction: column; gap: 3px; min-width: 0; }
+.beans-download-item .beans-download-title { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13.5px; line-height: 1.25; }
+.beans-download-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.beans-download-item-meta { overflow: hidden; color: var(--text-muted); font-size: 12px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.beans-reason { color: var(--error-text); font-weight: 500; }
+.beans-download-item-tools { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; }
+.beans-tool { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); cursor: pointer; transition: background .15s, color .15s; }
+.beans-tool svg { width: 16px; height: 16px; }
+.beans-tool:hover:not(:disabled) { background: var(--ctrl-bg-hover); color: var(--text-main); }
+.beans-tool:disabled { opacity: .45; cursor: default; }
+.beans-download-item.is-failed .beans-tool { color: var(--error-text); }
+.beans-download-item.is-failed .beans-tool:hover:not(:disabled) { background: var(--error-border); color: var(--error-text); }
 .beans-cc-badge { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; padding: 1px 5px; border-radius: 4px; background: var(--ctrl-bg-hover); color: var(--text-muted); font-size: 9px; font-weight: 700; line-height: 1.4; letter-spacing: .04em; }
 
-/* Drawer footer: tooltip + Clear all */
-.beans-drawer-list-head { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: auto; padding: 12px 2px 0; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
-#beans-clear-downloads { flex: 0 0 auto; margin-left: auto; padding: 6px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background .15s, color .15s; }
-#beans-clear-downloads:hover { background: var(--ctrl-bg-hover); color: var(--text-main); }
+/* Remove-from-history (top-right, appears on hover / keyboard focus) */
+.beans-item-remove { position: absolute; top: 7px; right: 8px; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--ctrl-bg-hover); color: var(--text-muted); opacity: 0; cursor: pointer; transition: opacity .15s, background .15s, color .15s; }
+.beans-item-remove svg { width: 9px; height: 9px; }
+.beans-item-remove:hover { background: color-mix(in srgb, var(--text-main) 20%, transparent); color: var(--text-main); }
+.beans-download-item:hover .beans-item-remove,
+.beans-url-item:hover .beans-item-remove,
+.beans-item-remove:focus-visible { opacity: 1; }
+
+/* One style for both "Clear all" footers (downloads drawer + URL history) */
+.beans-list-footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: auto; padding: 12px 2px 0; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+.beans-clear-btn { flex: 0 0 auto; margin-left: auto; padding: 6px 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background .15s, color .15s; }
+.beans-clear-btn:hover { background: var(--ctrl-bg-hover); color: var(--text-main); }
+
+/* Floating tooltip for [data-tip] and toast messages */
+.beans-tip { position: fixed; z-index: 1600; max-width: 280px; padding: 7px 11px; border: 1px solid color-mix(in srgb, var(--text-main) 8%, transparent); border-radius: 9px; background: var(--bg-card); box-shadow: 0 8px 24px rgba(0, 0, 0, .35); color: var(--text-main); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.beans-tip.show { opacity: 1; }
+.beans-toast { position: fixed; left: 50%; bottom: 28px; z-index: 1700; max-width: min(420px, calc(100vw - 32px)); padding: 11px 18px; border: 1px solid color-mix(in srgb, var(--text-main) 8%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--bg-card) 90%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: var(--shadow); color: var(--text-main); font-size: 13px; opacity: 0; transform: translate(-50%, 12px); transition: opacity .25s ease, transform .25s ease; pointer-events: none; }
+.beans-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.beans-toast.error { color: var(--error-text); }
+
+/* Offline banner (top bar) */
+.beans-offline { position: absolute; top: 12px; left: 50%; display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: var(--error-bg); color: var(--error-text); font-size: 13px; font-weight: 500; transform: translateX(-50%); }
+.beans-offline[hidden] { display: none; }
 
 /* Information tooltip */
 .beans-info-tooltip { position: relative; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 6px; color: var(--text-muted); cursor: help; }
@@ -209,6 +223,7 @@ textarea:focus-visible,
 /* Panels */
 .beans-tab-panel { display: none; flex: 1; flex-direction: column; gap: 18px; min-height: 0; padding: 2px 2px 0 0; overflow-y: auto; }
 .beans-tab-panel.active { display: flex; animation: beansFadeIn .18s ease-out; }
+.beans-tab-panel > * { flex-shrink: 0; }
 @keyframes beansFadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Fields: small caption above a rounded control */
@@ -285,15 +300,120 @@ textarea:focus-visible,
 #settings-save-btn:disabled { opacity: .5; cursor: default; }
 
 /* =========================================================
+   ROUND 2: scrolling drawer body, info icons, tabs, About, legal
+   ========================================================= */
+
+/* Drawer: one scrolling body between the header and the pinned footer */
+.beans-drawer-body { flex: 1 1 auto; min-height: 0; margin: 4px -10px 0 0; padding: 0 10px 12px 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text-main) 30%, transparent) transparent; }
+.beans-drawer-body::-webkit-scrollbar { width: 10px; }
+.beans-drawer-body::-webkit-scrollbar-track { background: transparent; }
+.beans-drawer-body::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 99px; background: color-mix(in srgb, var(--text-main) 30%, transparent); background-clip: padding-box; }
+.beans-drawer-body::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text-main) 48%, transparent); background-clip: padding-box; }
+.beans-download-active,
+.beans-download-list { display: block; flex: none; min-height: 0; margin: 0; padding: 0; overflow: visible; }
+.beans-download-active:empty,
+.beans-download-list:empty { display: none; }
+.beans-section-title { display: flex; align-items: baseline; gap: 6px; margin: 18px 4px 8px; color: var(--text-muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.beans-section-title span { font-weight: 500; font-variant-numeric: tabular-nums; opacity: .8; }
+.beans-group { display: flex; flex-direction: column; }
+.beans-group + .beans-group { margin-top: 10px; }
+.beans-group > .beans-active-card { margin: 0 0 10px; }
+.beans-group > .beans-active-card:last-child { margin-bottom: 0; }
+.beans-download-item.is-queued .beans-tool { color: var(--text-muted); }
+.beans-download-item.is-queued .beans-download-item-meta { color: var(--text-muted); }
+
+/* ⓘ info icon (uses the shared [data-tip] tooltip) */
+.beans-info { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 4px; padding: 0; vertical-align: -4px; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); cursor: help; transition: color .15s; }
+.beans-info svg { width: 15px; height: 15px; }
+.beans-info:hover,
+.beans-info:focus-visible { color: var(--text-main); outline: none; }
+.beans-info:focus-visible { box-shadow: 0 0 0 3px var(--accent-tint); }
+.me-subtitle-title { margin-bottom: 0; }
+
+/* Cookies row: custom file chooser */
+.beans-cookies-row { flex-wrap: nowrap; gap: 8px; }
+.beans-file-name { flex: 1 1 auto; min-width: 0; overflow: hidden; color: var(--text-muted); font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
+.beans-file-name.has-file { color: var(--text-main); }
+
+/* Tabs: three segments + update dot */
+.beans-tab-btn { position: relative; }
+.beans-dot { position: absolute; top: 6px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.beans-dot[hidden] { display: none; }
+.beans-nav-button.has-update .beans-nav-icon { position: relative; }
+.beans-nav-button.has-update .beans-nav-icon::after { content: ""; position: absolute; top: -1px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg-card); }
+
+/* About */
+.beans-about-card { display: flex; flex-direction: column; gap: 14px; }
+.beans-about-header { margin-bottom: 0; }
+.beans-update-row { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+.beans-update-status { flex: 1 1 auto; min-width: 0; color: var(--text-muted); font-size: .82rem; line-height: 1.4; }
+.beans-update-status.is-new { color: var(--text-main); font-weight: 600; }
+.beans-update-status.is-error { color: var(--error-text); }
+.beans-update-row .beans-settings-button { flex: 0 0 auto; text-decoration: none; white-space: nowrap; }
+.beans-update-row a.beans-settings-button { background: var(--accent); color: #fff; font-weight: 600; }
+.beans-update-row a.beans-settings-button[hidden] { display: none; }
+.beans-update-row button:disabled { opacity: .55; cursor: default; }
+.beans-group-list { display: flex; flex-direction: column; overflow: hidden; border-radius: 16px; background: var(--ctrl-bg); }
+.beans-row-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 13px 16px; border: 0; background: transparent; color: var(--text-main); font: inherit; font-size: .9rem; text-align: left; text-decoration: none; cursor: pointer; transition: background .15s; }
+.beans-row-link + .beans-row-link { border-top: 1px solid color-mix(in srgb, var(--text-main) 7%, transparent); }
+.beans-row-link:hover { background: var(--ctrl-bg-hover); }
+.beans-chevron { width: 16px; height: 16px; color: var(--text-muted); flex: 0 0 auto; }
+
+/* Legal pages */
+.beans-settings-tabs.is-hidden { display: none; }
+.beans-back { align-self: flex-start; padding: 4px 10px 4px 4px; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: .9rem; font-weight: 500; cursor: pointer; }
+.beans-back:hover { text-decoration: underline; }
+.beans-legal-title { margin: 0; color: var(--text-main); font-size: 1.15rem; font-weight: 650; letter-spacing: -.01em; }
+.beans-legal-body { color: var(--text-muted); font-size: .86rem; line-height: 1.6; }
+.beans-legal-body h5 { margin: 18px 0 4px; color: var(--text-main); font-size: .9rem; font-weight: 600; }
+.beans-legal-body p { margin: 0 0 8px; }
+.beans-legal-body ul { margin: 6px 0 10px; padding-left: 20px; }
+.beans-legal-body li { margin-bottom: 4px; }
+.beans-legal-body strong { color: var(--text-main); }
+
+.beans-settings-actions.is-hidden { display: none; }
+
+.beans-engine-title { display: block; color: var(--text-main); font-size: .88rem; font-weight: 600; }
+.beans-engine-sub { display: block; margin-top: 2px; color: var(--text-muted); font-size: .8rem; }
+.beans-engine-sub.is-new { color: var(--text-main); font-weight: 600; }
+.beans-engine-sub.is-error { color: var(--error-text); }
+.beans-update-row .beans-settings-button[hidden] { display: none; }
+
+/* Extractor position: centred, never clipped. Change the -10vh to move Home up/down. */
+.beans-workspace-content > .extractor-card { margin: auto; }
+#phase-2 { position: relative; top: -10vh; }
+
+/* Step 2 scales with window height so it fits (with padding, no scrollbar) in a normal window.
+   Only a very short window scrolls. */
+#phase-3 #meta-thumb { max-height: clamp(140px, 28vh, 250px); }
+@media (max-height: 860px) {
+  #phase-3 { padding: 20px; }
+  #phase-3 .preview-box { gap: 10px; margin-bottom: 16px; padding: 10px; }
+  #phase-3 .quality-grid { margin-bottom: 14px; }
+  #phase-3 .pill-btn { padding: 9px 12px; }
+  #phase-3 .cancel-btn { margin-top: 8px; padding: 6px 16px; }
+}
+
+/* Settings ✕ turns into a Back arrow on legal pages */
+.beans-modal-close .icon-back { display: none; }
+.beans-modal-close.is-back .icon-close { display: none; }
+.beans-modal-close.is-back .icon-back { display: block; }
+
+/* Footer ⓘ in the drawer + URL history: same icon as Settings, sits at the left */
+.beans-list-footer .beans-info { margin: 0; vertical-align: baseline; }
+
+/* =========================================================
    RESPONSIVE — must stay LAST so it overrides the base rules
    ========================================================= */
 @media (max-width: 760px) {
   .beans-topbar { min-height: 56px; padding: 12px 16px; }
   .beans-workspace-content { align-items: flex-start; padding: 16px; }
+  .beans-workspace-content > .extractor-card { margin: 0 auto; }
+  #phase-2 { top: 0; }
   #settings-modal .beans-modal-content { padding: 22px; }
 }
 @media (max-width: 420px) {
-  .beans-app-shell.sidebar-expanded .beans-sidebar { flex-basis: 210px; width: 210px; min-width: 210px; }
+  .beans-app-shell.sidebar-expanded .beans-sidebar { width: 210px; }
   .beans-download-drawer { top: 6px; right: 6px; bottom: 6px; width: calc(100vw - 12px); padding: 16px 14px 12px; }
   .beans-drawer-header h2 { font-size: 20px; }
   .beans-workspace-content { padding: 12px; }
